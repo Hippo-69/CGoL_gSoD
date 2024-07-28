@@ -1,0 +1,3 @@
+[submodule "cpads"]
+	path = cpads
+	url = https://gitlab.com/hatsya/open-source/cpads.git

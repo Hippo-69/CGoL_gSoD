@@ -1,0 +1,21 @@
+stages:
+    - test
+    - nutshell
+
+before_script:
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - apt-get update -qy
+    - apt-get install -y g++
+
+test:
+    image: python:3.8
+    stage: test
+    script:
+        - bash tests/test_all.sh
+
+nutshell:
+    image: python:3.8
+    stage: nutshell
+    script:
+        - bash tests/test_nutshell.sh
