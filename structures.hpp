@@ -26,8 +26,9 @@ struct ProblemState {
 
     // fields to be computed from above and origin (reaction_allowed, objects_forbidden)
     uint64_t early_hash;
-    //apg::bitworld output_gliders; not needed during the computation could be calculated when processing a(n unclear) solution
     uint32_t early_generation, stable_generation;
+    uint32_t num_output_gliders;
+    //apg::bitworld output_gliders; not needed during the computation could be calculated when processing a(n unclear) solution
     double spanning_tree_cost; // evaluation of progress
 
 };

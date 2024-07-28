@@ -37,9 +37,9 @@ struct UniqueEnsurer {
 
     mutex_type mtx;
 
-    apg::bitword origin;
-    apg::bitword reaction_allowed; // includes both reaction and possible objects placement
-    apg::bitword objects_forbidden; // objects cannot be placed here as it would react with pattern history
+    apg::bitworld origin;
+    apg::bitworld reaction_allowed; // includes both reaction and possible objects placement
+    apg::bitworld objects_forbidden; // objects cannot be placed here as it would react with pattern history
 
     uint32_t max_gliders_allowed = 2;
     uint32_t origin_period;
@@ -51,9 +51,15 @@ struct UniqueEnsurer {
 
     UniqueEnsurerTable hash_to_added_object_cost;
 
+    UniqueEnsurer (const UniqueEnsurer &_ue);
+
+    UniqueEnsurer (apg::bitworld _origin, apg::bitworld _reaction_allowed, apg::bitworld _objects_forbidden) {
+        origin = _origin; reaction_allowed = _reaction_allowed; objects_forbidden = _objects_forbidden;
+    };
+
     uint32_t get_best_solution_cost() {
         std::unique_lock<mutex_type> lock(mtx);
-        return best_cost_solution;
+        return best_solution_cost;
     }
 
     uint32_t _get_cost_unsafe(uint64_t hash) const {
@@ -99,30 +105,29 @@ struct UniqueEnsurer {
         }
     }
 
-    void save_last_solution() {
+    void save_last_solution(apg::pattern start) {
         std::ofstream out("SoD_"+std::to_string(solutions.size())+".mc");
-        solutions[solutions.size()-1].starting_pattern(origin).write_macrocell(out);
+        start.write_macrocell(out);
         out.close();
     }
 
-    void save_solution(ProblemState ps) {
+    void save_solution(ProblemState ps, apg::pattern start) {
         std::unique_lock<mutex_type> lock(mtx);
-        bool has_no_gliders = ps.gliders.totalPopulation() == 0;
-        if (has_no_gliders) {
+        if (ps.num_output_gliders == 0) {
             if (ps.added_objects_cost == best_solution_cost) {
-                std::ofstream out("SoD_best_cleean.mc");
-                ps.starting_pattern(origin).write_macrocell(out);
+                std::ofstream out("SoD_best_clean.mc");
+                start.write_macrocell(out);
                 out.close();
             } else {
-                std::cerr << "\33[31;1mClean solution not best (" << added_objects_cost << "!=" << best_solution_cost << ") current best added objects cost!\033[0m" << std::endl;
+                std::cerr << "\33[31;1mClean solution not best (" << ps.added_objects_cost << "!=" << best_solution_cost << ") current best added objects cost!\033[0m" << std::endl;
             }
         }
-        solutions.push_back(ps); save_last_solution();
+        solutions.push_back(ps); save_last_solution(start);
     }
 
-    void save_progress(ProblemState ps, uint64_t depth, uint64_t beamIndex) {
+    void save_progress(apg::pattern start, uint64_t depth, uint64_t beamIndex) {
         std::ofstream out("SoD_Progress_"+std::to_string(depth)+"_"+std::to_string(beamIndex)+".mc");
-        ps.starting_pattern(origin).write_macrocell(out);
+        start.write_macrocell(out);
         out.close();
     }
 
