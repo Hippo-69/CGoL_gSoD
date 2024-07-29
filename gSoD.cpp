@@ -25,6 +25,12 @@ std::vector<apg::bitworld> load_file(std::string filename) {
     return vbw;
 }
 
+void save_pattern(apg::pattern patt, std::string filename) {
+    std::ofstream out(filename);
+    patt.write_macrocell(out);
+    out.close();
+}
+
 struct SODThread {
 
     apg::lifetree<uint32_t, 1> lt;
@@ -152,26 +158,35 @@ struct SODThread {
         late_env = y;
     }
 
-    // parsing lifehistory pattern with history of the circuit. It can contain state 4 extension marking reaction_allowed
+    // parsing lifehistory pattern with history of the circuit.
+    // It can contain state 4 extension marking additional reaction_allowed
     // otherwise a default neighbourhood of the pattern is chosen (not implemented yet)
+    // states 5 and 1 have the same behaviour
+    // state 3 outside bounding box of states 1,5 denotes forbidden directed input glider lines
+    // states 1,2,5 close neighbourhood prevents added objects
     UniqueEnsurer parse_pattern(const std::vector<apg::bitworld> &vbw) {
         for(uint32_t l=0;l<vbw.size();l++) {// debug
-            std::ofstream out("Input_plane_"+std::to_string(l)+".mc");
-            b2p(vbw[l]).write_macrocell(out);
-            out.close();
+            save_pattern(b2p(vbw[l]), "Input_plane_"+std::to_string(l)+".mc");
         }
-        apg::pattern origin_patt = b2p(vbw[0]);
-        apg::pattern reaction_allowed_patt = b2p(vbw[0])+b2p(vbw[1])+b2p(vbw[2]);//to be debugged
-        if (b2p(vbw[1]).empty()) {
+        apg::pattern origin_patt = (b2p(vbw[0]) - b2p(vbw[3])) + b2p(vbw[2]); //states 1 and 5
+        apg::pattern input_glider_lines_forbidden_patt = b2p(vbw[0]) - origin_patt; // state 3
+        apg::pattern reaction_allowed_patt = b2p(vbw[1])-input_glider_lines_forbidden_patt; //states 1,2,4,5
+        apg::pattern state4 = b2p(vbw[3])-b2p(vbw[0]); // state 4
+        apg::pattern objects_forbidden_patt = (reaction_allowed_patt - state4).convolve(influence);// historyenvelope (1,2,5) close neighbourhood
+        if (state4.empty()) {// states 4 not present let us fill them
             //todo reaction_allowed_patt = approx_convex_hull(reaction_allowed_patt);
             apg::pattern halo2 = influence;
             halo2 = halo2.convolve(halo2).convolve(halo2); // radius 6
             halo2 = halo2.convolve(halo2); // radius 12
+            halo2 = halo2.convolve(halo2); // radius 24
             reaction_allowed_patt = reaction_allowed_patt.convolve(halo2);
         }
-        apg::pattern objects_forbidden_patt = (b2p(vbw[0])+b2p(vbw[2])).convolve(influence);// to be debugged
+        save_pattern(origin_patt, "gSoD_origin.mc");
+        save_pattern(input_glider_lines_forbidden_patt, "gSoD_input_glider_lines_forbidden.mc");
+        save_pattern(reaction_allowed_patt, "gSoD_reaction_allowed.mc");
+        save_pattern(objects_forbidden_patt, "gSoD_objects_forbidden.mc");
 
-        UniqueEnsurer ue(vbw[0],reaction_allowed_patt.flatlayer(0),objects_forbidden_patt.flatlayer(0));
+        UniqueEnsurer ue(origin_patt.flatlayer(0),reaction_allowed_patt.flatlayer(0),objects_forbidden_patt.flatlayer(0),input_glider_lines_forbidden_patt.flatlayer(0));
         ue.solutions.clear();
         ue.origin_period = origin_patt.ascertain_period();
         if (ue.origin_period == 0) {
@@ -387,6 +402,60 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
     int64_t bbox[4] = {0, 0, 0, 0}; thread->origin.getrect(bbox);
     uint64_t n_lanes_onedir = (bbox[2]+bbox[3]+8);
     uint64_t n_tasks = 2 * n_lanes_onedir;
+    std::vector<bool> n_allowed(n_tasks);std::vector<bool> s_allowed(n_tasks);
+    for(uint32_t i=0;i<n_tasks;i++) {
+        n_allowed[i]=true;s_allowed[i]=true;
+    }
+    apg::bitworld forbidden_glider_lanes = ue->input_glider_lines_forbidden; //x,y projections may not intersect bbox projections (otherwise ignored)
+    int64_t cell_bbox[4] = {0, 0, 0, 0};
+    while (forbidden_glider_lanes.population()) {
+        apg::bitworld cell = forbidden_glider_lanes.get1cell();forbidden_glider_lanes -= cell;
+        cell.getbbox(cell_bbox);
+        if (cell_bbox[1]<bbox[1]) {
+            if (cell_bbox[0]<bbox[0]) {
+                int lane = cell_bbox[1]-cell_bbox[0];
+                if (lane >= (bbox[1]-bbox[0]-bbox[2]-4)) {
+                    uint32_t l_idx = lane - (bbox[1]-bbox[0]-bbox[2]-4);
+                    if (l_idx < n_lanes_onedir) {
+                        s_allowed[n_lanes_onedir+l_idx] = false;
+                    }
+                }
+            }
+            else if ((cell_bbox[0] > bbox[0]+bbox[2])) {
+                int lane = cell_bbox[1]+cell_bbox[0];
+                if (lane >= (bbox[1]+bbox[0]-7)) {
+                    uint32_t l_idx = lane - (bbox[1]+bbox[0]-7);
+                    if (l_idx < n_lanes_onedir) {
+                        s_allowed[l_idx] = false;
+                    }
+                }
+            }
+        }
+        else if ((cell_bbox[1] > bbox[1]+bbox[3])) {
+            if (cell_bbox[0]<bbox[0]) {
+                int lane = cell_bbox[1]+cell_bbox[0];
+                if (lane >= (bbox[1]+bbox[0]-7)) {
+                    uint32_t l_idx = lane - (bbox[1]+bbox[0]-7);
+                    if (l_idx < n_lanes_onedir) {
+                        n_allowed[l_idx] = false;
+                    }
+                }
+            }
+            else if ((cell_bbox[0] > bbox[0]+bbox[2])) {
+                int lane = cell_bbox[1]-cell_bbox[0];
+                if (lane >= (bbox[1]-bbox[0]-bbox[2]-4)) {
+                    uint32_t l_idx = lane - (bbox[1]-bbox[0]-bbox[2]-4);
+                    if (l_idx < n_lanes_onedir) {
+                        n_allowed[n_lanes_onedir+l_idx] = false;
+                    }
+                }
+            }
+        }
+    }
+    apg::pattern glidernw(&(thread->lt), "2o$obo$o!", "b3s23");
+    apg::pattern gliderse(&(thread->lt), "bo$2bo$3o!", "b3s23");
+    apg::pattern gliderne(&(thread->lt), "b2o$obo$2bo!", "b3s23");
+    apg::pattern glidersw(&(thread->lt), "bo$o$3o!", "b3s23");
     for (;;) {
         // dequeue subtask:
         uint64_t idx = (uint64_t) ((*ctr)++);
@@ -394,60 +463,68 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
         if (idx >= n_tasks) { break; } //xpy lines and ymx lines ... for each of them gliders in both directions with origin period different stat phases should be tried ... each "unique stable pattern is added to bsc" with a glider in ps
         if (idx >= n_lanes_onedir) {//y-x lanes
             lane = idx - n_lanes_onedir + bbox[1]-bbox[0]-bbox[2]-4;
-            apg::pattern glidernw(&(thread->lt), "2o$obo$o!", "b3s23");
-            apg::pattern gliderse(&(thread->lt), "bo$2bo$3o!", "b3s23");
-            for(uint64_t ph=0;ph<ue->origin_period;ph++) {
-                ProblemState psnw;
-                psnw.added_objects_cost=0;
-                if (lane > bbox[1]+bbox[3]-bbox[0]-bbox[2]) {
-                    y = bbox[1] + bbox[3] + ue->origin_period/4 + 3;
-                    x = y - lane;
-                } else {
-                    x = bbox[0] + bbox[2] + ue->origin_period/4 + 3;
-                    y = x + lane;
+            if (n_allowed[idx]) {
+                for(uint64_t ph=0;ph<ue->origin_period;ph++) {
+                    ProblemState psnw;
+                    psnw.added_objects_cost=0;
+                    if (lane > bbox[1]+bbox[3]-bbox[0]-bbox[2]) {
+                        y = bbox[1] + bbox[3] + ue->origin_period/4 + 3;
+                        x = y - lane;
+                    } else {
+                        x = bbox[0] + bbox[2] + ue->origin_period/4 + 3;
+                        y = x + lane;
+                    }
+                    psnw.added_objects = (glidernw[ph].shift(x,y)).flatlayer(0);
+                    thread->try_ps(psnw, *bsc, *ue, ue->max_extra_gens);
                 }
-                psnw.added_objects = (glidernw[ph].shift(x,y)).flatlayer(0);
-                thread->try_ps(psnw, *bsc, *ue, ue->max_extra_gens);
-                ProblemState psse;
-                psse.added_objects_cost=0;
-                if (lane > bbox[1]-bbox[0]) {
-                    x = bbox[0] - ue->origin_period/4 - 6;
-                    y = x + lane;
-                } else {
-                    y = bbox[1] - ue->origin_period/4 - 6;
-                    x = y - lane;
+            }
+            if (s_allowed[idx]) {
+                for(uint64_t ph=0;ph<ue->origin_period;ph++) {
+                    ProblemState psse;
+                    psse.added_objects_cost=0;
+                    if (lane > bbox[1]-bbox[0]) {
+                        x = bbox[0] - ue->origin_period/4 - 6;
+                        y = x + lane;
+                    } else {
+                        y = bbox[1] - ue->origin_period/4 - 6;
+                        x = y - lane;
+                    }
+                    psse.added_objects = (gliderse[ph].shift(x,y)).flatlayer(0);
+                    thread->try_ps(psse, *bsc, *ue, ue->max_extra_gens);
                 }
-                psse.added_objects = (gliderse[ph].shift(x,y)).flatlayer(0);
-                thread->try_ps(psse, *bsc, *ue, ue->max_extra_gens);
             }
         }
         else {//x+y lanes
             lane = idx + bbox[1]+bbox[0]-7;
-            apg::pattern gliderne(&(thread->lt), "b2o$obo$2bo!", "b3s23");
-            apg::pattern glidersw(&(thread->lt), "bo$o$3o!", "b3s23");
-            for(uint64_t ph=0;ph<ue->origin_period;ph++) {
-                ProblemState psne;
-                psne.added_objects_cost=0;
-                if (lane > bbox[1]+bbox[3]+bbox[0]) {
-                    y = bbox[1] + bbox[3] + ue->origin_period/4 + 3;
-                    x = lane - y;
-                } else {
-                    x = bbox[0] - ue->origin_period/4 - 6;
-                    y = lane - x;
+            if (n_allowed[idx]) {
+                for(uint64_t ph=0;ph<ue->origin_period;ph++) {
+                    ProblemState psne;
+                    psne.added_objects_cost=0;
+                    if (lane > bbox[1]+bbox[3]+bbox[0]) {
+                        y = bbox[1] + bbox[3] + ue->origin_period/4 + 3;
+                        x = lane - y;
+                    } else {
+                        x = bbox[0] - ue->origin_period/4 - 6;
+                        y = lane - x;
+                    }
+                    psne.added_objects = (gliderne[ph].shift(x,y)).flatlayer(0);
+                    thread->try_ps(psne, *bsc, *ue, ue->max_extra_gens);
                 }
-                psne.added_objects = (gliderne[ph].shift(x,y)).flatlayer(0);
-                thread->try_ps(psne, *bsc, *ue, ue->max_extra_gens);
-                ProblemState pssw;
-                pssw.added_objects_cost=0;
-                if (lane > bbox[0]+bbox[2]+bbox[1]) {
-                    x = bbox[0]+bbox[2] + ue->origin_period/4 + 3;
-                    y = lane - x;
-                } else {
-                    y = bbox[1] - ue->origin_period/4 - 6;
-                    x = lane - y;
+            }
+            if (s_allowed[idx]) {
+                for(uint64_t ph=0;ph<ue->origin_period;ph++) {
+                    ProblemState pssw;
+                    pssw.added_objects_cost=0;
+                    if (lane > bbox[0]+bbox[2]+bbox[1]) {
+                        x = bbox[0]+bbox[2] + ue->origin_period/4 + 3;
+                        y = lane - x;
+                    } else {
+                        y = bbox[1] - ue->origin_period/4 - 6;
+                        x = lane - y;
+                    }
+                    pssw.added_objects = (glidersw[ph].shift(x,y)).flatlayer(0);
+                    thread->try_ps(pssw, *bsc, *ue, ue->max_extra_gens);
                 }
-                pssw.added_objects = (glidersw[ph].shift(x,y)).flatlayer(0);
-                thread->try_ps(pssw, *bsc, *ue, ue->max_extra_gens);
             }
         }
     }
@@ -483,8 +560,11 @@ void start_gsod(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer
         bsc += bscv[i];
     }
     problems.clear();
+    int beamindex=0;
     for (auto it = bsc.pmpq.begin(); it != bsc.pmpq.end(); ++it) {
-        problems.push_back(bsc.contents[it->second]);
+        ProblemState ps = bsc.contents[it->second];
+        ue.save_progress(gsodv[0].origin+gsodv[0].b2p(ps.added_objects), 0, ++beamindex);
+        problems.push_back(ps);
     }
 }
 
@@ -501,16 +581,20 @@ void run_main(  std::string infile,
     uint32_t depth=0;
     std::cerr << "Loading problem..." << std::flush;
     std::vector<apg::bitworld> vbw = load_file<4>(infile);
+    std::cerr << "Parsing problem..." << std::flush;
     UniqueEnsurer ue=gsodv[0].parse_pattern(vbw);
     ue.max_gliders_allowed = max_gliders_allowed;
     ue.max_extra_gens = max_extra_gens;
     ue.max_branching = max_branching;
 
+    std::cerr << "Starting treads..." << std::flush;
     for (uint32_t i = 0; i < parallelism; i++) {
         gsodv[i].init_patterns(ue.origin, ue.reaction_allowed, ue.objects_forbidden);
     }
 
+    std::cerr << "Looking for starting gliders ... " << std::flush;
     start_gsod(gsodv, beamwidth, ue, problems);
+    std::cerr << "Starting adding objects ... " << std::flush;
     while (!(problems.empty())) {
         std::cerr << " (" << depth << ")" ;
         run1iter(gsodv, beamwidth, ue, problems, ++depth);
@@ -519,16 +603,24 @@ void run_main(  std::string infile,
 
 } // namespace gsod
 
-
 int main(int argc, char* argv[]) {
 
-    bool incorrectly_called;
-    if ((argc<4)||(argc>7)) {incorrectly_called = true;}
+    bool incorrectly_called=false;
+    std::ostringstream err;
+    if ((argc<4)||(argc>7)) {incorrectly_called = true; err << "Number of arguments = " << argc << "!";}
     for (int i = 2; i < argc; i++) {
-        if (argv[i][0] == '-') { incorrectly_called = true; }
+        if (argv[i][0] == '-') { incorrectly_called = true; err << "Negative argument " << i << "!"; break;}
+    }
+    if (!incorrectly_called) {
+        std::string filename = argv[1];
+        std::ifstream f(filename.c_str());
+        if (!f.good()) {
+            incorrectly_called = true;
+            err << "File "<< filename << " does no exist!";
+        }
     }
     if (incorrectly_called) {
-        std::cerr << " correct call gSoD <pattern file> <beamwidth> <parallelism> [<max_gliders_allowed>(2)] [<max_extra_gens>(1024)] [<max_branching>(16384)] " << std::endl;
+        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_gliders_allowed>(2)] [<max_extra_gens>(1024)] [<max_branching>(16384)] " << std::endl;
         return 1;
     }
 
