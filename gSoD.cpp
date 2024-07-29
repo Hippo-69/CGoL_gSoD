@@ -12,7 +12,7 @@
 #include "structures.hpp"
 #include "unique_ensurer.hpp"
 
-#define BIG_SAVE_FREQ 10
+#define BIG_SAVE_FREQ 1 //0
 
 namespace gsod {
 
@@ -52,75 +52,107 @@ struct SODThread {
         return pat;
     }
 
-    void init_patterns(apg::bitworld _origin, apg::bitworld _reaction_allowed, apg::bitworld _objects_forbidden) {//each thread have different lt, so must have its separate pattern "constants"
-        origin = b2p(_origin); reaction_allowed = b2p(_reaction_allowed); objects_forbidden = b2p(_objects_forbidden);
+    void init_patterns(UniqueEnsurer &ue) {//each thread have different lt, so must have its separate pattern "constants"
+        origin = b2p(ue.origin); reaction_allowed = b2p(ue.reaction_allowed); objects_forbidden = b2p(ue.objects_forbidden);
 
-        apg::pattern blinker(&lt, "3o!", "b3s23");
-            objectsSource.push_back({blinker, 467});
-            objectsSource.push_back({blinker[1], 467});
-        apg::pattern block(&lt, "2o$2o!", "b3s23");
-            objectsSource.push_back({block, 493});
-        apg::pattern beehive(&lt, "b2o$o2bo$b2o!", "b3s23");
-            objectsSource.push_back({beehive, 615});
-            objectsSource.push_back({beehive.transform("rcw", 0, 0), 615});
-        apg::pattern pond(&lt, "b2o$o2bo$o2bo$b2o!", "b3s23");
-            objectsSource.push_back({pond, 685});
-        apg::pattern loaf(&lt, "2bo$bobo$o2bo$b2o!", "b3s23");
-            objectsSource.push_back({loaf, 714});
-            objectsSource.push_back({loaf.transform("rcw", 0, 0), 714});
-            objectsSource.push_back({loaf.transform("flip", 0, 0), 714});
-            objectsSource.push_back({loaf.transform("rccw", 0, 0), 714});
-        apg::pattern tub(&lt, "bo$obo$bo!", "b3s23");
-            objectsSource.push_back({tub, 726});
-        apg::pattern boat(&lt, "2o$obo$bo!", "b3s23");
-            objectsSource.push_back({boat, 743});
-            objectsSource.push_back({boat.transform("rcw", 0, 0), 743});
-            objectsSource.push_back({boat.transform("flip", 0, 0), 743});
-            objectsSource.push_back({boat.transform("rccw", 0, 0), 743});
-        apg::pattern ship(&lt, "2o$obo$b2o!", "b3s23");
-            objectsSource.push_back({ship, 767});
-            objectsSource.push_back({ship.transform("rcw", 0, 0), 767});
-        apg::pattern barge(&lt, "bo$obo$bobo$2bo!", "b3s23");
-            objectsSource.push_back({barge, 816});
-            objectsSource.push_back({barge.transform("rcw", 0, 0), 816});
-        apg::pattern longboat(&lt, "2o$obo$bobo$2bo!", "b3s23");
-            objectsSource.push_back({longboat, 868});
-            objectsSource.push_back({longboat.transform("rcw", 0, 0), 868});
-            objectsSource.push_back({longboat.transform("flip", 0, 0), 868});
-            objectsSource.push_back({longboat.transform("rccw", 0, 0), 868});
-        apg::pattern mango(&lt, "b2o$o2bo$bo2bo$2b2o!", "b3s23");
-            objectsSource.push_back({mango, 1010});
-            objectsSource.push_back({mango.transform("rcw", 0, 0), 1010});
-        apg::pattern shiptie(&lt, "2o$obo$b2o$3b2o$3bobo$4b2o!", "b3s23");
-            objectsSource.push_back({shiptie, 1050});
-            objectsSource.push_back({shiptie.transform("rcw", 0, 0), 1050});
-        apg::pattern eater1(&lt, "2o$obo$2bo$2b2o!", "b3s23");
-            objectsSource.push_back({eater1, 1120});
-            objectsSource.push_back({eater1.transform("rcw", 0, 0), 1120});
-            objectsSource.push_back({eater1.transform("flip", 0, 0), 1120});
-            objectsSource.push_back({eater1.transform("rccw", 0, 0), 1120});
-            objectsSource.push_back({eater1.transform("swap_xy", 0, 0), 1120});
-            objectsSource.push_back({eater1.transform("flip_x", 0, 0), 1120});
-            objectsSource.push_back({eater1.transform("flip_y", 0, 0), 1120});
-            objectsSource.push_back({eater1.transform("swap_xy_flip", 0, 0), 1120});
-        /*
+        if (ue.max_object_types_allowed>0) {
+            apg::pattern blinker(&lt, "3o!", "b3s23");
+                objectsSource.push_back({blinker, 467});
+                objectsSource.push_back({blinker[1], 467});
+        }
+        if (ue.max_object_types_allowed>1) {
+            apg::pattern block(&lt, "2o$2o!", "b3s23");
+                objectsSource.push_back({block, 493});
+        }
+        if (ue.max_object_types_allowed>2) {
+            apg::pattern beehive(&lt, "b2o$o2bo$b2o!", "b3s23");
+                objectsSource.push_back({beehive, 615});
+                objectsSource.push_back({beehive.transform("rcw", 0, 0), 615});
+        }
+        if (ue.max_object_types_allowed>3) {
+            apg::pattern pond(&lt, "b2o$o2bo$o2bo$b2o!", "b3s23");
+                objectsSource.push_back({pond, 685});
+        }
+        if (ue.max_object_types_allowed>4) {
+            apg::pattern loaf(&lt, "2bo$bobo$o2bo$b2o!", "b3s23");
+                objectsSource.push_back({loaf, 714});
+                objectsSource.push_back({loaf.transform("rcw", 0, 0), 714});
+                objectsSource.push_back({loaf.transform("flip", 0, 0), 714});
+                objectsSource.push_back({loaf.transform("rccw", 0, 0), 714});
+        }
+        if (ue.max_object_types_allowed>5) {
+            apg::pattern tub(&lt, "bo$obo$bo!", "b3s23");
+                objectsSource.push_back({tub, 726});
+        }
+        if (ue.max_object_types_allowed>6) {
+            apg::pattern boat(&lt, "2o$obo$bo!", "b3s23");
+                objectsSource.push_back({boat, 743});
+                objectsSource.push_back({boat.transform("rcw", 0, 0), 743});
+                objectsSource.push_back({boat.transform("flip", 0, 0), 743});
+                objectsSource.push_back({boat.transform("rccw", 0, 0), 743});
+        }
+        if (ue.max_object_types_allowed>7) {
+            apg::pattern ship(&lt, "2o$obo$b2o!", "b3s23");
+                objectsSource.push_back({ship, 767});
+                objectsSource.push_back({ship.transform("rcw", 0, 0), 767});
+        }
+        if (ue.max_object_types_allowed>8) {
+            apg::pattern barge(&lt, "bo$obo$bobo$2bo!", "b3s23");
+                objectsSource.push_back({barge, 816});
+                objectsSource.push_back({barge.transform("rcw", 0, 0), 816});
+        }
+        if (ue.max_object_types_allowed>9) {
+            apg::pattern longboat(&lt, "2o$obo$bobo$2bo!", "b3s23");
+                objectsSource.push_back({longboat, 868});
+                objectsSource.push_back({longboat.transform("rcw", 0, 0), 868});
+                objectsSource.push_back({longboat.transform("flip", 0, 0), 868});
+                objectsSource.push_back({longboat.transform("rccw", 0, 0), 868});
+        }
+        if (ue.max_object_types_allowed>10) {
+            apg::pattern mango(&lt, "b2o$o2bo$bo2bo$2b2o!", "b3s23");
+                objectsSource.push_back({mango, 1010});
+                objectsSource.push_back({mango.transform("rcw", 0, 0), 1010});
+        }
+        if (ue.max_object_types_allowed>11) {
+            apg::pattern shiptie(&lt, "2o$obo$b2o$3b2o$3bobo$4b2o!", "b3s23");
+                objectsSource.push_back({shiptie, 1050});
+                objectsSource.push_back({shiptie.transform("rcw", 0, 0), 1050});
+        }
+        if (ue.max_object_types_allowed>12) {
+            apg::pattern eater1(&lt, "2o$obo$2bo$2b2o!", "b3s23");
+                objectsSource.push_back({eater1, 1120});
+                objectsSource.push_back({eater1.transform("rcw", 0, 0), 1120});
+                objectsSource.push_back({eater1.transform("flip", 0, 0), 1120});
+                objectsSource.push_back({eater1.transform("rccw", 0, 0), 1120});
+                objectsSource.push_back({eater1.transform("swap_xy", 0, 0), 1120});
+                objectsSource.push_back({eater1.transform("flip_x", 0, 0), 1120});
+                objectsSource.push_back({eater1.transform("flip_y", 0, 0), 1120});
+                objectsSource.push_back({eater1.transform("swap_xy_flip", 0, 0), 1120});
+        }
+        if (ue.max_object_types_allowed>13) {
             apg::pattern aircraftcarrier(&lt, "2o$o$2bo$b2o!", "b3s23");
                 objectsSource.push_back({aircraftcarrier, 1370});
                 objectsSource.push_back({aircraftcarrier.transform("rcw", 0, 0), 1370});
                 objectsSource.push_back({aircraftcarrier.transform("flip_x", 0, 0), 1370});
                 objectsSource.push_back({aircraftcarrier.transform("swap_xy", 0, 0), 1370});
+        }
+        if (ue.max_object_types_allowed>14) {
             apg::pattern elevener(&lt, "2o$obo$2bo$2b3o$5bo$4b2o!", "b3s23");
                 objectsSource.push_back({elevener, 1430});
                 objectsSource.push_back({elevener.transform("rcw", 0, 0), 1430});
                 objectsSource.push_back({elevener.transform("flip", 0, 0), 1430});
                 objectsSource.push_back({elevener.transform("rccw", 0, 0), 1430});
+        }
+        if (ue.max_object_types_allowed>15) {
             apg::pattern intergralsign(&lt, "2o$obo$2bo$2bobo$3b2o!", "b3s23");
                 objectsSource.push_back({intergralsign, 1450});
                 objectsSource.push_back({intergralsign.transform("rcw", 0, 0), 1450});
                 objectsSource.push_back({intergralsign.transform("flip_x", 0, 0), 1450});
                 objectsSource.push_back({intergralsign.transform("swap_xy", 0, 0), 1450});
-            objectsSource.push_back(apg::pattern shillelagh(&lt, "2o$obo$2bo$bo$b2o!", "b3s23");
-                objectsSource.push_back({{shillelagh, 1470})
+        }
+        if (ue.max_object_types_allowed>16) {
+            apg::pattern shillelagh(&lt, "2o$obo$2bo$bo$b2o!", "b3s23");
+                objectsSource.push_back({shillelagh, 1470});
                 objectsSource.push_back({shillelagh.transform("rcw", 0, 0), 1470});
                 objectsSource.push_back({shillelagh.transform("flip", 0, 0), 1470});
                 objectsSource.push_back({shillelagh.transform("rccw", 0, 0), 1470});
@@ -128,6 +160,8 @@ struct SODThread {
                 objectsSource.push_back({shillelagh.transform("flip_x", 0, 0), 1470});
                 objectsSource.push_back({shillelagh.transform("flip_y", 0, 0), 1470});
                 objectsSource.push_back({shillelagh.transform("swap_xy_flip", 0, 0), 1470});
+        }
+        if (ue.max_object_types_allowed>17) {
             apg::pattern transblockonlonghook(&lt, "2ob2o$2obo$3bo$3bobo$4b2o!", "b3s23");
                 objectsSource.push_back({transblockonlonghook, 1480});
                 objectsSource.push_back({transblockonlonghook.transform("rcw", 0, 0), 1480});
@@ -137,7 +171,7 @@ struct SODThread {
                 objectsSource.push_back({transblockonlonghook.transform("flip_x", 0, 0), 1480});
                 objectsSource.push_back({transblockonlonghook.transform("flip_y", 0, 0), 1480});
                 objectsSource.push_back({transblockonlonghook.transform("swap_xy_flip", 0, 0), 1480});
-        */
+        }
     }
 
     void early_and_late(apg::pattern x, uint64_t early_gens, apg::pattern &early_pattern, apg::pattern &early_env, uint64_t late_gens, apg::pattern &late_env) {
@@ -158,7 +192,7 @@ struct SODThread {
         late_env = y;
     }
 
-    // parsing lifehistory pattern with history of the circuit.
+    // parsing lifehistory pattern (near (0,0)!) with history of the circuit.
     // It can contain state 4 extension marking additional reaction_allowed
     // otherwise a default neighbourhood of the pattern is chosen (not implemented yet)
     // states 5 and 1 have the same behaviour
@@ -229,7 +263,7 @@ struct SODThread {
             }
             out_gliders = (next - next_base).convolve(influence) & next; // part of the gliders could still be in allowed
             uint64_t gliders_pop = out_gliders.totalPopulation();
-            if (((gliders_pop % 5)!=0) || (gliders_pop / 5 > ue.max_gliders_allowed)) {
+            if (((gliders_pop % 5)!=0) || (gliders_pop / 5 > ue.max_output_gliders_allowed)) {
                 return 0; // forbidden
                 // too many gliders or gliders not formed cleanly before leaving allowed
                 // there could still be unprobable case of objects of propper size created out of allowed with propper sizes in each checkpoint on the way to fake extra solutions
@@ -245,21 +279,25 @@ struct SODThread {
         apg::pattern start = origin + b2p(ps.added_objects);
         ps.stable_generation = get_stable_generation(start, max_gen, out_gliders, stabilised, ue);
         if (ps.stable_generation==0) {//does not stabilise
+            //std::cerr << "x";
             return false;
         }
         ps.num_output_gliders = out_gliders.totalPopulation() / 5;
         bool is_solution = (stabilised.totalPopulation()==0);
         ps.early_generation = ps.stable_generation > ue.origin_period + 256 ? ps.stable_generation - 256 : ue.origin_period;
-        ps.early_hash = (origin+b2p(ps.added_objects))[ps.early_generation].totalHash(1000);//todo diameter? is this "lab" dependent? if so, flatlayer should be passed to ue and ue should have its lab to read hashes from
+        ps.early_hash = 17+(origin+b2p(ps.added_objects))[ps.early_generation].totalHash(1000);
+        //todo diameter? is this "lab" dependent? if so, flatlayer should be passed to ue and ue should have its lab to read hashes from
         if (ue.leq_cost_update(ps.early_hash, ps.added_objects_cost, is_solution && (ps.num_output_gliders==0))) {
             // was overtaken (possibly by a different thread)
             // at least it saves the spanning_tree_cost calculation when bsc would filter it anyways
             // calculating spanning_tree_cost only when new early_hash appears could be a small improvement (reusing the old result)
+            //std::cerr << "l";
             return false;
         }
         if (is_solution) {
             ue.save_solution(ps, start);
             if (ps.num_output_gliders==0) {
+                //std::cerr << "s";
                 return true;
             }
         }
@@ -268,6 +306,7 @@ struct SODThread {
         //ps.output_gliders = out_gliders.flatlayer(0);
         ps.spanning_tree_cost = spanning_tree_cost_calc(stable_envelope);
         bsc.try_insert(ps);
+        //std::cerr << "i";
         return false;
     }
 
@@ -298,22 +337,23 @@ struct SODThread {
         early_and_late(origin+b2p(ps.added_objects), ps.early_generation, early_pattern, early_env, ps.stable_generation, late_env);
 
         uint32_t maximal_allowed_object_cost = best_solution_cost - ps.added_objects_cost;
-
+        uint32_t last_cost = 0;
         apg::pattern current_objects_forbidden = objects_forbidden + early_env.convolve(influence);
         apg::pattern objects_allowed = reaction_allowed - current_objects_forbidden;
         apg::pattern to_touch = late_env.convolve(influence) & objects_allowed;
 
         uint64_t branching_remaining = ue.max_branching;
         for(ObjectWithCost &owc : objectsSource) {
+            last_cost = owc.object_cost;
             if ((branching_remaining == 0) || (owc.object_cost > maximal_allowed_object_cost)) {
                     break;
             }
             // find bitmap of lucorners where the object could be inserted
-            apg::pattern object_to_add_env = owc.object + owc.object[1], object_to_add_flip = owc.object.transform("flip", 0, 0);
+            apg::pattern object_to_add_env = owc.object + owc.object[1], object_to_add_env_flip = object_to_add_env.transform("flip", 0, 0);
 
-            apg::pattern lucorners_to_touch = to_touch.convolve(object_to_add_flip);
+            apg::pattern lucorners_to_touch = to_touch.convolve(object_to_add_env_flip);
             apg::pattern collisions = lucorners_to_touch.convolve(object_to_add_env) - objects_allowed;
-            apg::pattern lucorners = lucorners_to_touch - collisions.convolve(object_to_add_flip);
+            apg::pattern lucorners = lucorners_to_touch - collisions.convolve(object_to_add_env_flip);
 
             apg::bitworld lu_bw = lucorners.flatlayer(0); int64_t bbox[4] = {0};
             while (lu_bw.population()) {
@@ -328,6 +368,7 @@ struct SODThread {
                 }
             }
         }
+        std::cerr << "(" << last_cost << ":" << branching_remaining << ")";
     }
 };
 
@@ -337,6 +378,7 @@ void run_worker(std::atomic<uint64_t> *ctr, uint64_t n_tasks, SODThread *thread,
         // dequeue subtask:
         uint64_t idx = (uint64_t) ((*ctr)++);
         if (idx >= n_tasks) { break; }
+        std::cerr << "[" << idx << "]";
         thread->generate_successors(problems[idx], *bsc, *ue);
     }
 }
@@ -468,10 +510,10 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                     ProblemState psnw;
                     psnw.added_objects_cost=0;
                     if (lane > bbox[1]+bbox[3]-bbox[0]-bbox[2]) {
-                        y = bbox[1] + bbox[3] + ue->origin_period/4 + 3;
+                        y = bbox[1] + bbox[3] + ue->origin_period/4 + 23;
                         x = y - lane;
                     } else {
-                        x = bbox[0] + bbox[2] + ue->origin_period/4 + 3;
+                        x = bbox[0] + bbox[2] + ue->origin_period/4 + 23;
                         y = x + lane;
                     }
                     psnw.added_objects = (glidernw[ph].shift(x,y)).flatlayer(0);
@@ -483,10 +525,10 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                     ProblemState psse;
                     psse.added_objects_cost=0;
                     if (lane > bbox[1]-bbox[0]) {
-                        x = bbox[0] - ue->origin_period/4 - 6;
+                        x = bbox[0] - ue->origin_period/4 - 26;
                         y = x + lane;
                     } else {
-                        y = bbox[1] - ue->origin_period/4 - 6;
+                        y = bbox[1] - ue->origin_period/4 - 26;
                         x = y - lane;
                     }
                     psse.added_objects = (gliderse[ph].shift(x,y)).flatlayer(0);
@@ -501,10 +543,10 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                     ProblemState psne;
                     psne.added_objects_cost=0;
                     if (lane > bbox[1]+bbox[3]+bbox[0]) {
-                        y = bbox[1] + bbox[3] + ue->origin_period/4 + 3;
+                        y = bbox[1] + bbox[3] + ue->origin_period/4 + 23;
                         x = lane - y;
                     } else {
-                        x = bbox[0] - ue->origin_period/4 - 6;
+                        x = bbox[0] - ue->origin_period/4 - 26;
                         y = lane - x;
                     }
                     psne.added_objects = (gliderne[ph].shift(x,y)).flatlayer(0);
@@ -516,10 +558,10 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                     ProblemState pssw;
                     pssw.added_objects_cost=0;
                     if (lane > bbox[0]+bbox[2]+bbox[1]) {
-                        x = bbox[0]+bbox[2] + ue->origin_period/4 + 3;
+                        x = bbox[0]+bbox[2] + ue->origin_period/4 + 23;
                         y = lane - x;
                     } else {
-                        y = bbox[1] - ue->origin_period/4 - 6;
+                        y = bbox[1] - ue->origin_period/4 - 26;
                         x = lane - y;
                     }
                     pssw.added_objects = (glidersw[ph].shift(x,y)).flatlayer(0);
@@ -571,9 +613,10 @@ void start_gsod(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer
 void run_main(  std::string infile,
                 uint32_t beamwidth,
                 uint32_t parallelism,
-                uint32_t max_gliders_allowed,
+                uint32_t max_output_gliders_allowed,
                 uint32_t max_extra_gens,
-                uint32_t max_branching) {
+                uint32_t max_branching,
+                uint32_t max_object_types_allowed) {
 
     std::vector<SODThread> gsodv(parallelism);
     std::vector<ProblemState> problems(1);
@@ -583,13 +626,14 @@ void run_main(  std::string infile,
     std::vector<apg::bitworld> vbw = load_file<4>(infile);
     std::cerr << "Parsing problem..." << std::flush;
     UniqueEnsurer ue=gsodv[0].parse_pattern(vbw);
-    ue.max_gliders_allowed = max_gliders_allowed;
+    ue.max_output_gliders_allowed = max_output_gliders_allowed;
     ue.max_extra_gens = max_extra_gens;
     ue.max_branching = max_branching;
+    ue.max_object_types_allowed = max_object_types_allowed;
 
     std::cerr << "Starting treads..." << std::flush;
     for (uint32_t i = 0; i < parallelism; i++) {
-        gsodv[i].init_patterns(ue.origin, ue.reaction_allowed, ue.objects_forbidden);
+        gsodv[i].init_patterns(ue);
     }
 
     std::cerr << "Looking for starting gliders ... " << std::flush;
@@ -607,7 +651,7 @@ int main(int argc, char* argv[]) {
 
     bool incorrectly_called=false;
     std::ostringstream err;
-    if ((argc<4)||(argc>7)) {incorrectly_called = true; err << "Number of arguments = " << argc << "!";}
+    if ((argc<4)||(argc>8)) {incorrectly_called = true; err << "Number of arguments = " << argc << "!";}
     for (int i = 2; i < argc; i++) {
         if (argv[i][0] == '-') { incorrectly_called = true; err << "Negative argument " << i << "!"; break;}
     }
@@ -620,26 +664,30 @@ int main(int argc, char* argv[]) {
         }
     }
     if (incorrectly_called) {
-        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_gliders_allowed>(2)] [<max_extra_gens>(1024)] [<max_branching>(16384)] " << std::endl;
+        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_output_gliders_allowed>(2)] [<max_extra_gens>(1024)] [<max_branching>(2048)] [<max_object_types_allowed>10)]" << std::endl;
         return 1;
     }
 
     uint32_t beamwidth = std::stoi(argv[2]);
     uint32_t parallelism = std::stoi(argv[3]);
-    uint32_t max_gliders_allowed = 2;
+    uint32_t max_output_gliders_allowed = 2;
     if (argc > 4) {
-        max_gliders_allowed = std::stoi(argv[4]);
+        max_output_gliders_allowed = std::stoi(argv[4]);
     }
     uint32_t max_extra_gens = 1024;
     if (argc > 5) {
         max_extra_gens = std::stoi(argv[5]);
     }
-    uint32_t max_branching = 16384;
+    uint32_t max_branching = 2048;
     if (argc > 6) {
         max_branching = std::stoi(argv[6]);
     }
+    uint32_t max_object_types_allowed = 10;
+    if (argc > 7) {
+        max_object_types_allowed = std::stoi(argv[7]);
+    }
 
-    gsod::run_main(argv[1], beamwidth, parallelism, max_gliders_allowed, max_extra_gens, max_branching);
+    gsod::run_main(argv[1], beamwidth, parallelism, max_output_gliders_allowed, max_extra_gens, max_branching, max_object_types_allowed);
 
     return 0;
 }

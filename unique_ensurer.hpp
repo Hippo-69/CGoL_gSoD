@@ -41,7 +41,8 @@ struct UniqueEnsurer {
     apg::bitworld reaction_allowed; // includes both reaction and possible objects placement
     apg::bitworld objects_forbidden; // objects cannot be placed here as it would react with pattern history
     apg::bitworld input_glider_lines_forbidden; // pixel in a lane blocks incoming glider in the lane (blocks just one x+y lane and/or one y-x lane) outside reaction_allowed
-    uint32_t max_gliders_allowed = 2;
+    uint32_t max_output_gliders_allowed = 2;
+    uint32_t max_object_types_allowed = 10;
     uint32_t origin_period;
     uint32_t max_branching = 16384; //to experiment with
     uint32_t max_extra_gens = 1024;
@@ -65,14 +66,19 @@ struct UniqueEnsurer {
     uint32_t _get_cost_unsafe(uint64_t hash) const {
         uint32_t idx = hash_to_added_object_cost.find(hash);
         if (idx == ((uint32_t) -1)) {
+            //std::cerr << "m";
             return ((uint32_t) -1);
         } else {
+            //std::cerr << "v(" << idx << ":" << hash_to_added_object_cost[idx].value << ")" ;
             return hash_to_added_object_cost[idx].value;
         }
     }
 
     bool _leq_cost_unsafe(uint64_t hash, uint32_t cost) const {
-        if (best_solution_cost <= cost) { return true; }
+        if (best_solution_cost <= cost) {
+            //std::cerr << "b";
+            return true;
+        }
         return (_get_cost_unsafe(hash) <= cost);
     }
 
@@ -89,6 +95,7 @@ struct UniqueEnsurer {
     bool leq_cost_update(uint64_t hash, uint32_t cost, bool is_clean_solution) {
         std::unique_lock<mutex_type> lock(mtx);
         if (_leq_cost_unsafe(hash, cost)) {
+            //std::cerr << "h(" << hash << ")";
             return true;
         } else {
             if (is_clean_solution) {
@@ -101,6 +108,7 @@ struct UniqueEnsurer {
             uee.next = 0;
             bool overwrite = true;
             hash_to_added_object_cost.insert(uee, overwrite);
+            //std::cerr << "n";
             return false;
         }
     }
