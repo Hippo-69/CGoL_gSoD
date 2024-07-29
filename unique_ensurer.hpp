@@ -99,7 +99,7 @@ struct UniqueEnsurer {
             return true;
         } else {
             if (is_clean_solution) {
-                std::cerr  << std::endl << "\033[32;1mFound clean solution with " << cost << " of added_objects .\033[0m";
+                std::cerr  << std::endl << "\033[32;1mFound clean solution with cost " << cost << " of added_objects .\033[0m";
                 best_solution_cost = cost;
             }
             UniqueEnsurerEntry uee;
@@ -113,8 +113,8 @@ struct UniqueEnsurer {
         }
     }
 
-    void save_last_solution(apg::pattern start) {
-        std::ofstream out("SoD_"+std::to_string(solutions.size())+".mc");
+    void save_last_solution(apg::pattern start, uint32_t cost, uint32_t num_output_gliders) {
+        std::ofstream out("SoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+".mc");
         start.write_macrocell(out);
         out.close();
     }
@@ -130,7 +130,7 @@ struct UniqueEnsurer {
                 std::cerr << "\33[31;1mClean solution not best (" << ps.added_objects_cost << "!=" << best_solution_cost << ") current best added objects cost!\033[0m" << std::endl;
             }
         }
-        solutions.push_back(ps); save_last_solution(start);
+        solutions.push_back(ps); save_last_solution(start, ps.added_objects_cost, ps.num_output_gliders);
     }
 
     void save_progress(apg::pattern start, uint64_t depth, uint64_t beamIndex) {

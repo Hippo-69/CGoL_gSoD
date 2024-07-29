@@ -254,12 +254,17 @@ struct SODThread {
     uint64_t get_stable_generation(apg::pattern starting_pattern, uint64_t max_gen, apg::pattern &out_gliders, apg::pattern &stabilised, UniqueEnsurer &ue) {
         uint64_t base_step = (ue.origin_period>8) ? ue.origin_period : 8;
         apg::pattern curr = starting_pattern, curr_base = curr & reaction_allowed;
+        bool started = false;
         for(uint64_t gen=0;gen<max_gen;gen+=base_step) {
             apg::pattern next = curr[base_step], next_base = next & reaction_allowed;
             if (next_base == curr_base) {
-                stabilised = curr_base;
-                //if (!((next & curr) - next_base).empty()) {return 0;} ... it could miss a case with gliders intersecting, but it would avoid stable trash of correct size
-                return gen;
+                if (started) {
+                    stabilised = curr_base;
+                    //if (!((next & curr) - next_base).empty()) {return 0;} ... it could miss a case with gliders intersecting, but it would avoid stable trash of correct size
+                    return gen;
+                }
+            } else {
+                started = true;
             }
             out_gliders = (next - next_base).convolve(influence) & next; // part of the gliders could still be in allowed
             uint64_t gliders_pop = out_gliders.totalPopulation();
