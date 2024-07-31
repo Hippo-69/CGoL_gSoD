@@ -57,7 +57,7 @@ struct BeamSearchContainer {
 
         if (idx >= maxsize) {
             auto opair = *(pmpq.rbegin());
-            if (ps.spanning_tree_cost >= opair.first) { return; }
+            if (ps.spanning_tree_cost + (double) ps.added_objects_cost/100 >= opair.first) { return; }
             idx = opair.second;
             pmpq.erase(opair);
             hash_to_idx.erase(contents[idx].early_hash);
@@ -66,7 +66,7 @@ struct BeamSearchContainer {
             contents.push_back(ps);
         }
 
-        pmpq.insert(std::pair<double, uint64_t>{contents[idx].spanning_tree_cost, idx});
+        pmpq.insert(std::pair<double, uint64_t>{contents[idx].spanning_tree_cost + (double) contents[idx].added_objects_cost / 100, idx});
         hash_to_idx[ps.early_hash] = idx;
     }
 

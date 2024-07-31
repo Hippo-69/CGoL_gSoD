@@ -279,7 +279,7 @@ struct SODThread {
         return 0;
     }
 
-    bool try_ps(ProblemState &ps, BeamSearchContainer &bsc, UniqueEnsurer &ue, uint64_t max_gen) {
+    bool try_ps(ProblemState &ps, BeamSearchContainer &bsc, UniqueEnsurer &ue, uint64_t max_gen, double spanning_tree_cost_to_beat) {
         apg::pattern out_gliders = origin, stabilised = origin; //to be rewritten
         apg::pattern start = origin + b2p(ps.added_objects);
         ps.stable_generation = get_stable_generation(start, max_gen, out_gliders, stabilised, ue);
@@ -292,25 +292,31 @@ struct SODThread {
         ps.early_generation = ps.stable_generation > ue.origin_period + 256 ? ps.stable_generation - 256 : ue.origin_period;
         ps.early_hash = 17+(origin+b2p(ps.added_objects))[ps.early_generation].totalHash(1000);
         //todo diameter? is this "lab" dependent? if so, flatlayer should be passed to ue and ue should have its lab to read hashes from
-        if (ue.leq_cost_update(ps.early_hash, ps.added_objects_cost, is_solution && (ps.num_output_gliders==0))) {
+        uint32_t output_glider_cost = ps.num_output_gliders * objectsSource[0].object_cost; //cost to "safely" reduce to the clean state
+        uint32_t independent_work_estimate = ((uint32_t) (ps.spanning_tree_cost/50) + 4) * objectsSource[0].object_cost; // constants to be worked on
+        int solution_clarity = is_solution ? (output_glider_cost) : -(output_glider_cost+independent_work_estimate);
+        if (ue.leq_cost_update(ps.early_hash, ps.added_objects_cost, solution_clarity)) {
             // was overtaken (possibly by a different thread)
             // at least it saves the spanning_tree_cost calculation when bsc would filter it anyways
             // calculating spanning_tree_cost only when new early_hash appears could be a small improvement (reusing the old result)
             //std::cerr << "l";
             return false;
         }
-        if (is_solution) {
-            ue.save_solution(ps, start);
-            if (ps.num_output_gliders==0) {
+        if ((is_solution) || (ue.get_best_solution_cost() == ps.added_objects_cost - solution_clarity)) {
+            ue.save_solution(ps, start, solution_clarity);
+            if (is_solution && (ps.num_output_gliders==0)) {// trying to add another not cheaper object cannot improve the solution
                 //std::cerr << "s";
                 return true;
             }
         }
+
         apg::pattern dummy1=origin, dummy2=origin, stable_envelope=origin; //to be redefined
         early_and_late(stabilised, 0, dummy1, dummy2, (ue.origin_period>2) ? ue.origin_period : 2, stable_envelope);
         //ps.output_gliders = out_gliders.flatlayer(0);
         ps.spanning_tree_cost = spanning_tree_cost_calc(stable_envelope);
-        bsc.try_insert(ps);
+        if ((ps.spanning_tree_cost < spanning_tree_cost_to_beat) || (ps.spanning_tree_cost<50.0)) {// single cluster remaining is so close to solution to try it, but an incentive to have the envelope closer could be required
+            bsc.try_insert(ps);
+        }
         //std::cerr << "i";
         return false;
     }
@@ -319,7 +325,7 @@ struct SODThread {
         ProblemState ps;
         ps.added_objects = (b2p(old_ps.added_objects) + added_object).flatlayer(0);
         ps.added_objects_cost = old_ps.added_objects_cost + added_object_cost;
-        return try_ps(ps, bsc, ue, old_ps.stable_generation + ue.max_extra_gens);
+        return try_ps(ps, bsc, ue, old_ps.stable_generation + ue.max_extra_gens, old_ps.spanning_tree_cost);
     }
 
     /*  at most max_branching times try adding as cheapest so far not tried (in the routine execution) object to the pattern.
@@ -415,7 +421,7 @@ void run1iter(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer &
         ProblemState ps = bsc.contents[it->second];
         if (saveit || first) {
             first = false;
-            ue.save_progress(gsodv[0].origin+gsodv[0].b2p(ps.added_objects), depth, ++beamindex);
+            ue.save_progress(gsodv[0].origin+gsodv[0].b2p(ps.added_objects), depth, ++beamindex, ps.spanning_tree_cost, ps.added_objects_cost);
         }
         problems.push_back(ps);
     }
@@ -444,7 +450,7 @@ void run1iter(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer &
     }
 }
 
-void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchContainer *bsc, UniqueEnsurer *ue) {
+void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchContainer *bsc, UniqueEnsurer *ue, double start_spanning_tree_cost_plus) {
 
     int64_t bbox[4] = {0, 0, 0, 0}; thread->origin.getrect(bbox);
     uint64_t n_lanes_onedir = (bbox[2]+bbox[3]+8);
@@ -522,7 +528,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                         y = x + lane;
                     }
                     psnw.added_objects = (glidernw[ph].shift(x,y)).flatlayer(0);
-                    thread->try_ps(psnw, *bsc, *ue, ue->max_extra_gens);
+                    thread->try_ps(psnw, *bsc, *ue, ue->max_extra_gens, start_spanning_tree_cost_plus);
                 }
             }
             if (s_allowed[idx]) {
@@ -537,7 +543,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                         x = y - lane;
                     }
                     psse.added_objects = (gliderse[ph].shift(x,y)).flatlayer(0);
-                    thread->try_ps(psse, *bsc, *ue, ue->max_extra_gens);
+                    thread->try_ps(psse, *bsc, *ue, ue->max_extra_gens, start_spanning_tree_cost_plus);
                 }
             }
         }
@@ -555,7 +561,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                         y = lane - x;
                     }
                     psne.added_objects = (gliderne[ph].shift(x,y)).flatlayer(0);
-                    thread->try_ps(psne, *bsc, *ue, ue->max_extra_gens);
+                    thread->try_ps(psne, *bsc, *ue, ue->max_extra_gens, start_spanning_tree_cost_plus);
                 }
             }
             if (s_allowed[idx]) {
@@ -570,7 +576,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
                         x = lane - y;
                     }
                     pssw.added_objects = (glidersw[ph].shift(x,y)).flatlayer(0);
-                    thread->try_ps(pssw, *bsc, *ue, ue->max_extra_gens);
+                    thread->try_ps(pssw, *bsc, *ue, ue->max_extra_gens, start_spanning_tree_cost_plus);
                 }
             }
         }
@@ -586,14 +592,19 @@ void start_gsod(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer
     std::atomic<uint64_t> ctr{0ull};
     int parallelism = gsodv.size();
 
-    std::cerr << "Running " << n_tasks << " lane tasks on " << parallelism << " threads..." << std::endl;
+    apg::pattern dummy1=gsodv[0].origin, dummy2=gsodv[0].origin, stable_envelope=gsodv[0].origin; //to be redefined
+    gsodv[0].early_and_late(gsodv[0].origin, 0, dummy1, dummy2, (ue.origin_period>2) ? ue.origin_period : 2, stable_envelope);
+    double start_spanning_tree_cost_to_beat = 0.1 + gsodv[0].spanning_tree_cost_calc(stable_envelope);
+
+    std::cerr << "Running " << n_tasks << " lane tasks on " << parallelism << " threads... spanning tree cost to beat " <<  start_spanning_tree_cost_to_beat << std::endl;
 
     std::vector<BeamSearchContainer> bscv(parallelism);
     std::vector<std::thread> workers;
 
+
     for (int i = 0; i < parallelism; i++) {
         bscv[i].maxsize = beamwidth;
-        workers.emplace_back(glider_worker, &ctr, &(gsodv[i]), &(bscv[i]), &ue);
+        workers.emplace_back(glider_worker, &ctr, &(gsodv[i]), &(bscv[i]), &ue, start_spanning_tree_cost_to_beat);
     }
 
     std::cerr << "Waiting for workers" << std::endl;
@@ -610,7 +621,7 @@ void start_gsod(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer
     int beamindex=0;
     for (auto it = bsc.pmpq.begin(); it != bsc.pmpq.end(); ++it) {
         ProblemState ps = bsc.contents[it->second];
-        ue.save_progress(gsodv[0].origin+gsodv[0].b2p(ps.added_objects), 0, ++beamindex);
+        ue.save_progress(gsodv[0].origin+gsodv[0].b2p(ps.added_objects), 0, ++beamindex, ps.spanning_tree_cost, 0);
         problems.push_back(ps);
     }
 }
@@ -669,13 +680,13 @@ int main(int argc, char* argv[]) {
         }
     }
     if (incorrectly_called) {
-        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_output_gliders_allowed>(2)] [<max_extra_gens>(1024)] [<max_branching>(2048)] [<max_object_types_allowed>10)]" << std::endl;
+        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_output_gliders_allowed>(200)] [<max_extra_gens>(1024)] [<max_branching>(2048)] [<max_object_types_allowed>10)]" << std::endl;
         return 1;
     }
 
     uint32_t beamwidth = std::stoi(argv[2]);
     uint32_t parallelism = std::stoi(argv[3]);
-    uint32_t max_output_gliders_allowed = 2;
+    uint32_t max_output_gliders_allowed = 200;
     if (argc > 4) {
         max_output_gliders_allowed = std::stoi(argv[4]);
     }

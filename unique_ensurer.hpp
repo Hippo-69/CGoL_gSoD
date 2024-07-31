@@ -92,15 +92,24 @@ struct UniqueEnsurer {
         return _leq_cost_unsafe(hash, cost);
     }
 
-    bool leq_cost_update(uint64_t hash, uint32_t cost, bool is_clean_solution) {
+    /*
+        negative solution_clarity means there remains something to destroy
+        positive is cost of output gliders (each is supposed to be stopped by a blinker (cheapest object)
+    */
+    bool leq_cost_update(uint64_t hash, uint32_t cost, int solution_clarity) {
         std::unique_lock<mutex_type> lock(mtx);
         if (_leq_cost_unsafe(hash, cost)) {
             //std::cerr << "h(" << hash << ")";
             return true;
         } else {
-            if (is_clean_solution) {
-                std::cerr  << std::endl << "\033[32;1mFound clean solution with cost " << cost << " of added_objects .\033[0m";
-                best_solution_cost = cost;
+            if (solution_clarity >= 0) {
+                std::cerr  << std::endl << "\033[32;1mFound solution with cost " << cost << " of added_objects with possble cost " << solution_clarity << " to stop output gliders.\033[0m";
+                best_solution_cost = cost + solution_clarity;
+            } else {
+                if (cost - solution_clarity < best_solution_cost) {
+                    std::cerr  << std::endl << "\033[32;1mSolution cost estimate changed to " << (cost - solution_clarity) << " according to partial " << cost << " of added_objects with possble cost " << solution_clarity << " to continue with gliders.\033[0m";
+                    best_solution_cost = cost - solution_clarity;
+                }
             }
             UniqueEnsurerEntry uee;
             uee.key = hash;
@@ -113,15 +122,15 @@ struct UniqueEnsurer {
         }
     }
 
-    void save_last_solution(apg::pattern start, uint32_t cost, uint32_t num_output_gliders) {
-        std::ofstream out("SoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+".mc");
+    void save_last_solution(apg::pattern start, uint32_t cost, uint32_t num_output_gliders, uint32_t expected_extra_cost) {
+        std::ofstream out("SoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(expected_extra_cost)+".mc");
         start.write_macrocell(out);
         out.close();
     }
 
-    void save_solution(ProblemState ps, apg::pattern start) {
+    void save_solution(ProblemState ps, apg::pattern start, int solution_clarity) {
         std::unique_lock<mutex_type> lock(mtx);
-        if (ps.num_output_gliders == 0) {
+        if (solution_clarity == 0) {
             if (ps.added_objects_cost == best_solution_cost) {
                 std::ofstream out("SoD_best_clean.mc");
                 start.write_macrocell(out);
@@ -130,11 +139,11 @@ struct UniqueEnsurer {
                 std::cerr << "\33[31;1mClean solution not best (" << ps.added_objects_cost << "!=" << best_solution_cost << ") current best added objects cost!\033[0m" << std::endl;
             }
         }
-        solutions.push_back(ps); save_last_solution(start, ps.added_objects_cost, ps.num_output_gliders);
+        solutions.push_back(ps); save_last_solution(start, ps.added_objects_cost, ps.num_output_gliders, (solution_clarity<0) ? -solution_clarity : 0);
     }
 
-    void save_progress(apg::pattern start, uint64_t depth, uint64_t beamIndex) {
-        std::ofstream out("SoD_Progress_"+std::to_string(depth)+"_"+std::to_string(beamIndex)+".mc");
+    void save_progress(apg::pattern start, uint64_t depth, uint64_t beamIndex, double spanning_tree_cost, uint32_t added_objects_cost) {
+        std::ofstream out("SoD_Progress_"+std::to_string(depth)+"_"+std::to_string(beamIndex)+"_"+std::to_string(spanning_tree_cost)+"_"+std::to_string(added_objects_cost)+".mc");
         start.write_macrocell(out);
         out.close();
     }
