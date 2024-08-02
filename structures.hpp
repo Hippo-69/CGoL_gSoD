@@ -30,6 +30,10 @@ struct ProblemState {
     uint32_t num_output_gliders;
     //apg::bitworld output_gliders; not needed during the computation could be calculated when processing a(n unclear) solution
     double spanning_tree_cost; // evaluation of progress
+    double total_cost() const {
+        double pessimism = 0.7;
+        return spanning_tree_cost * pessimism + added_objects_cost; // todo think about the relative constant
+    }
 
 };
 
@@ -46,9 +50,9 @@ struct BeamSearchContainer {
         if (it != hash_to_idx.end()) {//cheaper way to reach the same position
             uint64_t idx = it->second;
             if (ps.added_objects_cost < contents[idx].added_objects_cost) {
-                pmpq.erase(std::pair<double, uint64_t>{contents[idx].spanning_tree_cost, idx});
+                pmpq.erase(std::pair<double, uint64_t>{contents[idx].total_cost(), idx});
                 contents[idx] = ps;
-                pmpq.insert(std::pair<double, uint64_t>{contents[idx].spanning_tree_cost, idx});
+                pmpq.insert(std::pair<double, uint64_t>{contents[idx].total_cost(), idx});
             }
             return;
         }
@@ -57,7 +61,7 @@ struct BeamSearchContainer {
 
         if (idx >= maxsize) {
             auto opair = *(pmpq.rbegin());
-            if (ps.spanning_tree_cost + (double) ps.added_objects_cost/100 >= opair.first) { return; }
+            if (ps.total_cost() >= opair.first) { return; }
             idx = opair.second;
             pmpq.erase(opair);
             hash_to_idx.erase(contents[idx].early_hash);
@@ -66,7 +70,7 @@ struct BeamSearchContainer {
             contents.push_back(ps);
         }
 
-        pmpq.insert(std::pair<double, uint64_t>{contents[idx].spanning_tree_cost + (double) contents[idx].added_objects_cost / 100, idx});
+        pmpq.insert(std::pair<double, uint64_t>{contents[idx].total_cost(), idx});
         hash_to_idx[ps.early_hash] = idx;
     }
 

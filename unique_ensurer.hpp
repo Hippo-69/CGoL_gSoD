@@ -96,21 +96,12 @@ struct UniqueEnsurer {
         negative solution_clarity means there remains something to destroy
         positive is cost of output gliders (each is supposed to be stopped by a blinker (cheapest object)
     */
-    bool leq_cost_update(uint64_t hash, uint32_t cost, int solution_clarity) {
+    bool leq_cost_update(uint64_t hash, uint32_t cost) {
         std::unique_lock<mutex_type> lock(mtx);
         if (_leq_cost_unsafe(hash, cost)) {
             //std::cerr << "h(" << hash << ")";
             return true;
         } else {
-            if (solution_clarity >= 0) {
-                std::cerr  << std::endl << "\033[32;1mFound solution with cost " << cost << " of added_objects with possble cost " << solution_clarity << " to stop output gliders.\033[0m";
-                best_solution_cost = cost + solution_clarity;
-            } else {
-                if (cost - solution_clarity < best_solution_cost) {
-                    std::cerr  << std::endl << "\033[32;1mSolution cost estimate changed to " << (cost - solution_clarity) << " according to partial " << cost << " of added_objects with possble cost " << solution_clarity << " to continue with gliders.\033[0m";
-                    best_solution_cost = cost - solution_clarity;
-                }
-            }
             UniqueEnsurerEntry uee;
             uee.key = hash;
             uee.value = cost;
@@ -122,8 +113,23 @@ struct UniqueEnsurer {
         }
     }
 
+    bool best_cost_update(uint32_t cost, int solution_clarity) {
+        std::unique_lock<mutex_type> lock(mtx);
+        uint32_t best_cost_estimate = cost + std::abs(solution_clarity);
+        if (best_cost_estimate < best_solution_cost) {
+            if (solution_clarity >= 0) {
+                std::cerr  << std::endl << "\033[32;1mFound solution with cost " << cost << " of added_objects with possble cost " << solution_clarity << " to stop output gliders.\033[0m";
+            } else {
+                std::cerr  << std::endl << "\033[32;1mSolution cost estimate changed to " << best_cost_estimate << " according to partial " << cost << " of added_objects with estimated cost " << solution_clarity << " to continue with gliders.\033[0m";
+            }
+            best_solution_cost = best_cost_estimate;
+            return true;
+        }
+        return false;
+    }
+
     void save_last_solution(apg::pattern start, uint32_t cost, uint32_t num_output_gliders, uint32_t expected_extra_cost) {
-        std::ofstream out("SoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(expected_extra_cost)+".mc");
+        std::ofstream out("SoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(expected_extra_cost)+".mc");
         start.write_macrocell(out);
         out.close();
     }

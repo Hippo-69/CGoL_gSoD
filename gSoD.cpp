@@ -31,6 +31,10 @@ void save_pattern(apg::pattern patt, std::string filename) {
     out.close();
 }
 
+double identity(double sqlen) { // square of the euklid distance looks like the best linear estimate of the final cost (*0.7)
+    return sqlen;
+}
+
 struct SODThread {
 
     apg::lifetree<uint32_t, 1> lt;
@@ -41,6 +45,8 @@ struct SODThread {
     //I should allow to restrict some input glider lanes+directions.
     apg::pattern influence; //handy constant
     std::vector<ObjectWithCost> objectsSource; //all p at most 2
+
+    //int power_thousands; used to search optimal power of euklid dist for edges
 
     SODThread() : lt(1000), origin(&lt, "", "b3s23"), reaction_allowed(&lt, "", "b3s23"), objects_forbidden(&lt, "", "b3s23"), influence(&lt, "b3o$5o$5o$5o$b3o!", "b3s23") {
         influence = influence.shift(-2, -2);
@@ -245,7 +251,17 @@ struct SODThread {
         }
 
         std::vector<apg::edge64> all_edges = apg::spanning_graph(ccentres);
-        double stlength = apg::spanning_graph_to_tree(ccentres, 0, &std::sqrt, all_edges); // actually constant 2.0 scale does not matter
+        /*if (power_thousands <= 0) {
+            std::cerr << "Table of STT values depending on power_thousands starting on 0:" << std::endl;
+            for(power_thousands = 0; power_thousands<1000; ++power_thousands) {
+                double pt_stlength = apg::spanning_graph_to_tree(ccentres, 0, identity , all_edges); // actually constant 2.0 scale does not matter
+                std::cerr << pt_stlength << std::endl;
+            }
+        }
+        power_thousands = 500; // seems 1000 so identity function would work best ...
+        */
+
+        double stlength = apg::spanning_graph_to_tree(ccentres, 0, identity, all_edges); // actually constant 2.0 scale does not matter
         // if one wants to follow simeks program std::sqrt should be replaced by its 5/4 power (or better calculate the tree and then recompute the cost using this evaluation).
         // I would first experiment with the simple euklid distance mst.
         return stlength;
@@ -292,29 +308,32 @@ struct SODThread {
         ps.early_generation = ps.stable_generation > ue.origin_period + 256 ? ps.stable_generation - 256 : ue.origin_period;
         ps.early_hash = 17+(origin+b2p(ps.added_objects))[ps.early_generation].totalHash(1000);
         //todo diameter? is this "lab" dependent? if so, flatlayer should be passed to ue and ue should have its lab to read hashes from
-        uint32_t output_glider_cost = ps.num_output_gliders * objectsSource[0].object_cost; //cost to "safely" reduce to the clean state
-        uint32_t independent_work_estimate = ((uint32_t) (ps.spanning_tree_cost/50) + 4) * objectsSource[0].object_cost; // constants to be worked on
-        int solution_clarity = is_solution ? (output_glider_cost) : -(output_glider_cost+independent_work_estimate);
-        if (ue.leq_cost_update(ps.early_hash, ps.added_objects_cost, solution_clarity)) {
+        if (ue.leq_cost_update(ps.early_hash, ps.added_objects_cost)) {
             // was overtaken (possibly by a different thread)
             // at least it saves the spanning_tree_cost calculation when bsc would filter it anyways
             // calculating spanning_tree_cost only when new early_hash appears could be a small improvement (reusing the old result)
             //std::cerr << "l";
             return false;
         }
-        if ((is_solution) || (ue.get_best_solution_cost() == ps.added_objects_cost - solution_clarity)) {
-            ue.save_solution(ps, start, solution_clarity);
-            if (is_solution && (ps.num_output_gliders==0)) {// trying to add another not cheaper object cannot improve the solution
-                //std::cerr << "s";
-                return true;
-            }
-        }
-
         apg::pattern dummy1=origin, dummy2=origin, stable_envelope=origin; //to be redefined
         early_and_late(stabilised, 0, dummy1, dummy2, (ue.origin_period>2) ? ue.origin_period : 2, stable_envelope);
         //ps.output_gliders = out_gliders.flatlayer(0);
         ps.spanning_tree_cost = spanning_tree_cost_calc(stable_envelope);
-        if ((ps.spanning_tree_cost < spanning_tree_cost_to_beat) || (ps.spanning_tree_cost<50.0)) {// single cluster remaining is so close to solution to try it, but an incentive to have the envelope closer could be required
+
+        uint32_t output_glider_cost = ps.num_output_gliders * objectsSource[0].object_cost; //cost to "safely" reduce to the clean state
+        int independent_work_estimate = 1200 + ps.total_cost() - ps.added_objects_cost; // expected cost for restarted problem
+        int solution_clarity = is_solution ? (output_glider_cost) : -(output_glider_cost+independent_work_estimate);
+
+        if (ue.best_cost_update(ps.added_objects_cost, solution_clarity) || is_solution) {
+            ue.save_solution(ps, start, solution_clarity);
+            if (is_solution && (ps.num_output_gliders==0)) {
+                //std::cerr << std::endl << "\033[32;1mSolution " << ps.added_objects_cost << "/" << output_glider_cost << ":" << solution_clarity << "\033[0m";
+                // trying to add another not cheaper object cannot improve the solution
+                return true;
+            }
+        }
+
+        if (ps.spanning_tree_cost < spanning_tree_cost_to_beat) {// single cluster remaining is so close to solution to try it, but an incentive to have the envelope closer could be required
             bsc.try_insert(ps);
         }
         //std::cerr << "i";
@@ -325,7 +344,7 @@ struct SODThread {
         ProblemState ps;
         ps.added_objects = (b2p(old_ps.added_objects) + added_object).flatlayer(0);
         ps.added_objects_cost = old_ps.added_objects_cost + added_object_cost;
-        return try_ps(ps, bsc, ue, old_ps.stable_generation + ue.max_extra_gens, old_ps.spanning_tree_cost);
+        return try_ps(ps, bsc, ue, old_ps.stable_generation + ue.max_extra_gens, old_ps.spanning_tree_cost + 30);
     }
 
     /*  at most max_branching times try adding as cheapest so far not tried (in the routine execution) object to the pattern.
@@ -452,6 +471,8 @@ void run1iter(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer &
 
 void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchContainer *bsc, UniqueEnsurer *ue, double start_spanning_tree_cost_plus) {
 
+    // starting glider cost 1200 corresponds to expected cost for creating/redirecting the input glider
+
     int64_t bbox[4] = {0, 0, 0, 0}; thread->origin.getrect(bbox);
     uint64_t n_lanes_onedir = (bbox[2]+bbox[3]+8);
     uint64_t n_tasks = 2 * n_lanes_onedir;
@@ -519,7 +540,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
             if (n_allowed[idx]) {
                 for(uint64_t ph=0;ph<ue->origin_period;ph++) {
                     ProblemState psnw;
-                    psnw.added_objects_cost=0;
+                    psnw.added_objects_cost=1200;
                     if (lane > bbox[1]+bbox[3]-bbox[0]-bbox[2]) {
                         y = bbox[1] + bbox[3] + ue->origin_period/4 + 23;
                         x = y - lane;
@@ -534,7 +555,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
             if (s_allowed[idx]) {
                 for(uint64_t ph=0;ph<ue->origin_period;ph++) {
                     ProblemState psse;
-                    psse.added_objects_cost=0;
+                    psse.added_objects_cost=1200;
                     if (lane > bbox[1]-bbox[0]) {
                         x = bbox[0] - ue->origin_period/4 - 26;
                         y = x + lane;
@@ -552,7 +573,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
             if (n_allowed[idx]) {
                 for(uint64_t ph=0;ph<ue->origin_period;ph++) {
                     ProblemState psne;
-                    psne.added_objects_cost=0;
+                    psne.added_objects_cost=1200;
                     if (lane > bbox[1]+bbox[3]+bbox[0]) {
                         y = bbox[1] + bbox[3] + ue->origin_period/4 + 23;
                         x = lane - y;
@@ -567,7 +588,7 @@ void glider_worker(std::atomic<uint64_t> *ctr, SODThread *thread, BeamSearchCont
             if (s_allowed[idx]) {
                 for(uint64_t ph=0;ph<ue->origin_period;ph++) {
                     ProblemState pssw;
-                    pssw.added_objects_cost=0;
+                    pssw.added_objects_cost=1200;
                     if (lane > bbox[0]+bbox[2]+bbox[1]) {
                         x = bbox[0]+bbox[2] + ue->origin_period/4 + 23;
                         y = lane - x;
@@ -650,6 +671,7 @@ void run_main(  std::string infile,
     std::cerr << "Starting treads..." << std::flush;
     for (uint32_t i = 0; i < parallelism; i++) {
         gsodv[i].init_patterns(ue);
+        //gsodv[i].power_thousands = 500; //(i==0) ? -1 : 700;
     }
 
     std::cerr << "Looking for starting gliders ... " << std::flush;

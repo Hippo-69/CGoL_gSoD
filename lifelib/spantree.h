@@ -169,6 +169,41 @@ namespace apg {
         return score;
     }
 
+    double spanning_graph_to_tree(const std::vector<coords64> &coords, std::vector<edge64> *streeptr, double power, const std::vector<edge64> &sgraph) {
+
+        double score = 0.0;
+
+        // Initially colour every vertex differently:
+        dsds colours(coords.size());
+
+        // Compute squared length of edges:
+        std::vector<std::pair<int64_t, edge64> > sedges;
+        for (auto it = sgraph.begin(); it != sgraph.end(); ++it) {
+            coords64 a = coords[it->first];
+            coords64 b = coords[it->second];
+            int64_t xdiff = a.first - b.first;
+            int64_t ydiff = a.second - b.second;
+            int64_t sqlength = (xdiff * xdiff) + (ydiff * ydiff);
+            sedges.push_back(std::make_pair(sqlength, *it));
+        }
+
+        // Sort edges into ascending order:
+        std::sort(sedges.begin(), sedges.end());
+
+        // Apply Kruskal's algorithm:
+        for (std::vector<std::pair<int64_t, edge64> >::iterator it = sedges.begin(); it != sedges.end(); ++it) {
+            uint64_t a = it->second.first;
+            uint64_t b = it->second.second;
+            if (!colours.connected(a, b)) {
+                colours.merge(a, b);
+                if (streeptr != 0) { streeptr->push_back(it->second); }
+                if (power >= 0) { score += std::exp(power*std::log(it->first)); }
+            }
+        }
+
+        return score;
+    }
+
     double spanning_tree(const std::vector<coords64> &coords, std::vector<edge64> *streeptr, double (*scorer)(double)) {
 
         // Produce spanning graph (superset of spanning tree):
