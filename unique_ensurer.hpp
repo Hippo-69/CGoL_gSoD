@@ -82,7 +82,7 @@ struct UniqueEnsurer {
         return (_get_cost_unsafe(hash) <= cost);
     }
 
-    uint64_t size() {
+    uint32_t size() {
         std::unique_lock<mutex_type> lock(mtx);
         return hash_to_added_object_cost.size();
     }
@@ -148,7 +148,7 @@ struct UniqueEnsurer {
         solutions.push_back(ps); save_last_solution(start, ps.added_objects_cost, ps.num_output_gliders, (solution_clarity<0) ? -solution_clarity : 0);
     }
 
-    void save_progress(apg::pattern start, uint64_t depth, uint64_t beamIndex, double spanning_tree_cost, uint32_t added_objects_cost) {
+    void save_progress(apg::pattern start, uint32_t depth, uint32_t beamIndex, double spanning_tree_cost, uint32_t added_objects_cost) {
         std::ofstream out("SoD_Progress_"+std::to_string(depth)+"_"+std::to_string(beamIndex)+"_"+std::to_string(spanning_tree_cost)+"_"+std::to_string(added_objects_cost)+".mc");
         start.write_macrocell(out);
         out.close();
