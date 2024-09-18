@@ -30,8 +30,7 @@ struct ProblemState {
     uint32_t num_output_gliders;
     //apg::bitworld output_gliders; not needed during the computation could be calculated when processing a(n unclear) solution
     double spanning_tree_cost; // evaluation of progress
-    double total_cost() const {
-        double pessimism = 70;
+    double total_cost(double pessimism) const {
         return spanning_tree_cost * pessimism + added_objects_cost; // todo think about the relative constant
     }
 
@@ -44,15 +43,15 @@ struct BeamSearchContainer {
     std::set<std::pair<double, uint32_t>> pmpq; // poor man's priority queue
     std::unordered_map<uint64_t, uint32_t> hash_to_idx;
 
-    void try_insert(const ProblemState& ps) {
+    void try_insert(const ProblemState& ps, double pessimism) {
 
         auto it = hash_to_idx.find(ps.early_hash);
         if (it != hash_to_idx.end()) {//cheaper way to reach the same position
             uint32_t idx = it->second;
             if (ps.added_objects_cost < contents[idx].added_objects_cost) {
-                pmpq.erase(std::pair<double, uint32_t>{contents[idx].total_cost(), idx});
+                pmpq.erase(std::pair<double, uint32_t>{contents[idx].total_cost(pessimism), idx});
                 contents[idx] = ps;
-                pmpq.insert(std::pair<double, uint32_t>{contents[idx].total_cost(), idx});
+                pmpq.insert(std::pair<double, uint32_t>{contents[idx].total_cost(pessimism), idx});
             }
             return;
         }
@@ -61,7 +60,7 @@ struct BeamSearchContainer {
 
         if (idx >= maxsize) {
             auto opair = *(pmpq.rbegin());
-            if (ps.total_cost() >= opair.first) { return; }
+            if (ps.total_cost(pessimism) >= opair.first) { return; }
             idx = opair.second;
             pmpq.erase(opair);
             hash_to_idx.erase(contents[idx].early_hash);
@@ -70,13 +69,13 @@ struct BeamSearchContainer {
             contents.push_back(ps);
         }
 
-        pmpq.insert(std::pair<double, uint32_t>{contents[idx].total_cost(), idx});
+        pmpq.insert(std::pair<double, uint32_t>{contents[idx].total_cost(pessimism), idx});
         hash_to_idx[ps.early_hash] = idx;
     }
 
-    void operator+=(const BeamSearchContainer &other) {
+    void add(const BeamSearchContainer &other, double pessimism) {
         for (const auto &x : other.contents) {
-            try_insert(x);
+            try_insert(x, pessimism);
         }
     }
 };

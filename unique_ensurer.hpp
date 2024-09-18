@@ -41,11 +41,13 @@ struct UniqueEnsurer {
     apg::bitworld reaction_allowed; // includes both reaction and possible objects placement
     apg::bitworld objects_forbidden; // objects cannot be placed here as it would react with pattern history
     apg::bitworld input_glider_lines_forbidden; // pixel in a lane blocks incoming glider in the lane (blocks just one x+y lane and/or one y-x lane) outside reaction_allowed
+    apg::bitworld ori_added_objects;
     uint32_t max_output_gliders_allowed = 2;
     uint32_t max_object_types_allowed = 10;
     uint32_t origin_period;
     uint32_t max_branching = 16384; //to experiment with
     uint32_t max_extra_gens = 1024;
+    uint32_t pessimism = 70;
 
     uint32_t best_solution_cost = 999999999;
     std::vector<ProblemState> solutions; // differ by gliders issued, minimizing object cost for each possibility
@@ -54,8 +56,8 @@ struct UniqueEnsurer {
 
     UniqueEnsurer (const UniqueEnsurer &_ue);
 
-    UniqueEnsurer (apg::bitworld _origin, apg::bitworld _reaction_allowed, apg::bitworld _objects_forbidden, apg::bitworld _input_glider_lines_forbidden) {
-        origin = _origin; reaction_allowed = _reaction_allowed; objects_forbidden = _objects_forbidden; input_glider_lines_forbidden = _input_glider_lines_forbidden;
+    UniqueEnsurer (apg::bitworld _origin, apg::bitworld _reaction_allowed, apg::bitworld _objects_forbidden, apg::bitworld _input_glider_lines_forbidden, apg::bitworld _ori_added_objects) {
+        origin = _origin; reaction_allowed = _reaction_allowed; objects_forbidden = _objects_forbidden; input_glider_lines_forbidden = _input_glider_lines_forbidden; ori_added_objects = _ori_added_objects;
     };
 
     uint32_t get_best_solution_cost() {
@@ -129,7 +131,7 @@ struct UniqueEnsurer {
     }
 
     void save_last_solution(apg::pattern start, uint32_t cost, uint32_t num_output_gliders, uint32_t expected_extra_cost) {
-        std::ofstream out("SoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(expected_extra_cost)+".mc");
+        std::ofstream out("gSoD_"+std::to_string(solutions.size())+"_"+std::to_string(cost)+"_"+std::to_string(num_output_gliders)+"_"+std::to_string(expected_extra_cost)+".mc");
         start.write_macrocell(out);
         out.close();
     }

@@ -214,8 +214,9 @@ struct SODThread {
         for(uint32_t l=0;l<vbw.size();l++) {// debug
             save_pattern(b2p(vbw[l]), "Input_plane_"+std::to_string(l)+".mc");
         }
-        apg::pattern origin_patt = (b2p(vbw[0]) - b2p(vbw[3])) + b2p(vbw[2]); //states 1 and 5
-        apg::pattern input_glider_lines_forbidden_patt = b2p(vbw[0]) - origin_patt; // state 3
+        apg::pattern ori_added_objects_patt = b2p(vbw[2]); // state 5
+        apg::pattern origin_patt = (b2p(vbw[0]) - b2p(vbw[3])); //state 1
+        apg::pattern input_glider_lines_forbidden_patt = b2p(vbw[0]) - origin_patt - ori_added_objects_patt; // state 3
         apg::pattern reaction_allowed_patt = b2p(vbw[1])-input_glider_lines_forbidden_patt; //states 1,2,4,5
         apg::pattern state4 = b2p(vbw[3])-b2p(vbw[0]); // state 4
         apg::pattern objects_forbidden_patt = (reaction_allowed_patt - state4).convolve(influence);// historyenvelope (1,2,5) close neighbourhood
@@ -228,11 +229,12 @@ struct SODThread {
             reaction_allowed_patt = reaction_allowed_patt.convolve(halo2);
         }
         save_pattern(origin_patt, "gSoD_origin.mc");
+        save_pattern(ori_added_objects_patt, "ori_added_objects.mc");
         save_pattern(input_glider_lines_forbidden_patt, "gSoD_input_glider_lines_forbidden.mc");
         save_pattern(reaction_allowed_patt, "gSoD_reaction_allowed.mc");
         save_pattern(objects_forbidden_patt, "gSoD_objects_forbidden.mc");
 
-        UniqueEnsurer ue(origin_patt.flatlayer(0),reaction_allowed_patt.flatlayer(0),objects_forbidden_patt.flatlayer(0),input_glider_lines_forbidden_patt.flatlayer(0));
+        UniqueEnsurer ue(origin_patt.flatlayer(0),reaction_allowed_patt.flatlayer(0),objects_forbidden_patt.flatlayer(0),input_glider_lines_forbidden_patt.flatlayer(0),ori_added_objects_patt.flatlayer(0));
         ue.solutions.clear();
         ue.origin_period = origin_patt.ascertain_period();
         if (ue.origin_period == 0) {
@@ -333,7 +335,7 @@ struct SODThread {
         ps.locally_stable_generation = get_locally_stable_generation(start, ps.stable_generation, stabilised, ue);
 
         ps.early_generation = ps.locally_stable_generation > ue.origin_period + 256 ? ps.locally_stable_generation - 256 : ue.origin_period;
-        ps.early_hash = start[ps.early_generation].totalHash(1000);
+        ps.early_hash = start[ps.early_generation].flatlayer(0).hash();
         //todo diameter? is this "lab" dependent? if so, flatlayer should be passed to ue and ue should have its lab to read hashes from
         if (ue.leq_cost_update(ps.early_hash, ps.added_objects_cost)) {
             // was overtaken (possibly by a different thread)
@@ -348,7 +350,7 @@ struct SODThread {
         ps.spanning_tree_cost = spanning_tree_cost_calc(stable_envelope);
 
         uint32_t output_glider_cost = ps.num_output_gliders * objectsSource[0].object_cost; //cost to "safely" reduce to the clean state
-        int independent_work_estimate = 1200 + ps.total_cost() - ps.added_objects_cost; // expected cost for restarted problem
+        int independent_work_estimate = 1200 + ps.total_cost(ue.pessimism) - ps.added_objects_cost; // expected cost for restarted problem
         int solution_clarity = is_solution ? (output_glider_cost) : -(output_glider_cost+independent_work_estimate);
 
         if (ue.best_cost_update(ps.added_objects_cost, solution_clarity) || is_solution) {
@@ -361,7 +363,7 @@ struct SODThread {
         }
 
         if (ps.spanning_tree_cost < spanning_tree_cost_to_beat) {// single cluster remaining is so close to solution to try it, but an incentive to have the envelope closer could be required
-            bsc.try_insert(ps);
+            bsc.try_insert(ps, ue.pessimism);
         }
         //std::cerr << "i";
         return false;
@@ -463,7 +465,7 @@ void run1iter(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer &
     for (auto&& w : workers) { w.join(); }
 
     BeamSearchContainer bsc; bsc.maxsize = beamwidth;
-    for (int i = 0; i < parallelism; i++) { bsc += bscv[i]; }
+    for (int i = 0; i < parallelism; i++) { bsc.add(bscv[i],ue.pessimism); }
 
     problems.clear();
     int beamindex=0; bool first=true, saveit=(depth % BIG_SAVE_FREQ)==0;
@@ -667,7 +669,7 @@ void start_gsod(std::vector<SODThread> &gsodv, uint32_t beamwidth, UniqueEnsurer
     std::cerr << "Workers finished" << std::endl;
 
     for (int i = 0; i < parallelism; i++) {
-        bsc += bscv[i];
+        bsc.add(bscv[i], ue.pessimism);
     }
     problems.clear();
     int beamindex=0;
@@ -684,7 +686,8 @@ void run_main(  std::string infile,
                 uint32_t max_output_gliders_allowed,
                 uint32_t max_extra_gens,
                 uint32_t max_branching,
-                uint32_t max_object_types_allowed) {
+                uint32_t max_object_types_allowed,
+                uint32_t pessimism) {
 
     std::vector<SODThread> gsodv(parallelism);
     std::vector<ProblemState> problems(1);
@@ -698,6 +701,7 @@ void run_main(  std::string infile,
     ue.max_extra_gens = max_extra_gens;
     ue.max_branching = max_branching;
     ue.max_object_types_allowed = max_object_types_allowed;
+    ue.pessimism = pessimism;
 
     std::cerr << "Starting treads..." << std::flush;
     for (uint32_t i = 0; i < parallelism; i++) {
@@ -705,8 +709,21 @@ void run_main(  std::string infile,
         //gsodv[i].power_thousands = 500; //(i==0) ? -1 : 700;
     }
 
-    std::cerr << "Looking for starting gliders ... " << std::flush;
-    start_gsod(gsodv, beamwidth, ue, problems);
+    if (ue.ori_added_objects.population()) {
+        ProblemState ps;
+        ps.added_objects_cost=0;//
+        ps.added_objects = ue.ori_added_objects;
+        BeamSearchContainer bsc; bsc.maxsize = beamwidth;
+        gsodv[0].try_ps(ps, bsc, ue, ue.max_extra_gens, 999999999);
+        problems.clear();
+        for (auto it = bsc.pmpq.begin(); it != bsc.pmpq.end(); ++it) {
+            ProblemState ps = bsc.contents[it->second];
+            problems.push_back(ps);
+        }
+    } else {
+        std::cerr << "Looking for starting gliders ... " << std::flush;
+        start_gsod(gsodv, beamwidth, ue, problems);
+    }
     std::cerr << "Starting adding objects ... " << std::flush;
     while (!(problems.empty())) {
         std::cerr << " (" << depth << ")" ;
@@ -720,7 +737,7 @@ int main(int argc, char* argv[]) {
 
     bool incorrectly_called=false;
     std::ostringstream err;
-    if ((argc<4)||(argc>8)) {incorrectly_called = true; err << "Number of arguments = " << argc << "!";}
+    if ((argc<4)||(argc>9)) {incorrectly_called = true; err << "Number of arguments = " << argc << "!";}
     for (int i = 2; i < argc; i++) {
         if (argv[i][0] == '-') { incorrectly_called = true; err << "Negative argument " << i << "!"; break;}
     }
@@ -733,7 +750,7 @@ int main(int argc, char* argv[]) {
         }
     }
     if (incorrectly_called) {
-        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_output_gliders_allowed>(200)] [<max_extra_gens>(1024)] [<max_branching>(2048)] [<max_object_types_allowed>10)]" << std::endl;
+        std::cerr << err.str() << std::endl << "Correct call: gSoD <pattern file> <beamwidth> <parallelism> [<max_output_gliders_allowed>(200)] [<max_extra_gens>(1024)] [<max_branching>(2048)] [<max_object_types_allowed>10)] [<pessimism>70]" << std::endl;
         return 1;
     }
 
@@ -755,8 +772,12 @@ int main(int argc, char* argv[]) {
     if (argc > 7) {
         max_object_types_allowed = std::stoi(argv[7]);
     }
+    uint32_t pessimism = 70;
+    if (argc > 8) {
+        pessimism = std::stoi(argv[8]);
+    }
 
-    gsod::run_main(argv[1], beamwidth, parallelism, max_output_gliders_allowed, max_extra_gens, max_branching, max_object_types_allowed);
+    gsod::run_main(argv[1], beamwidth, parallelism, max_output_gliders_allowed, max_extra_gens, max_branching, max_object_types_allowed, pessimism);
 
     return 0;
 }

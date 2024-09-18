@@ -4,6 +4,7 @@
 #include "bitbounds.h"
 #include "sanirule.h"
 #include "classic/bpattern.h"
+#include "cpads/include/cpads/mxor.hpp"
 
 #include <stdint.h>
 #include <map>
@@ -388,6 +389,29 @@ namespace apg {
             return tldiag;
         }
 
+        int64_t get_brdiag() {
+
+            int64_t brdiag = -20000000000000ll;
+
+            std::map<std::pair<int32_t, int32_t>, uint64_t>::iterator it;
+            for (it = world.begin(); it != world.end(); /* no increment */ ) {// would be more efficient backwards
+                uint64_t tile = it->second;
+                if (tile == 0) {
+                    it = world.erase(it);
+                } else {
+                    int64_t diagonal = ((int64_t) it->first.first ) * 8;
+                    diagonal += ((int64_t) it->first.second ) * 8;
+                    if (diagonal + 14 > brdiag) {
+                        int64_t dz = uint64_br(tile);
+                        if (diagonal + dz > brdiag) { brdiag = diagonal + dz; }
+                    }
+                    ++it;
+                }
+            }
+
+            return brdiag;
+        }
+
         bool getdbox(int64_t *dbox) const {
 
             // These are set outside the admissible range:
@@ -509,6 +533,26 @@ namespace apg {
             }
         }
 
+        uint64_t hash() {
+            uint64_t ret=0;
+            for (auto it = world.begin(); it != world.end(); /* no increment */ ) {
+                uint64_t tile = it->second;
+                if (tile == 0) {
+                    // Empty tile; erase:
+                    it = world.erase(it);
+                } else {// I am not 100% sure the tales are always in the same order so I just sum ret values. Otherwise talehash neednot be computed separately and ret could be fibmixed with the values
+                    /* ret = hh::fibmix(ret+it->second); ret = hh::fibmix(ret+it->first.first); ret = hh::fibmix(ret+it->first.second) ;*/
+                    uint64_t talehash;
+                    talehash = hh::fibmix(it->second);
+                    talehash = hh::fibmix(talehash+it->first.first);
+                    talehash = hh::fibmix(talehash+it->first.second);
+                    ret += talehash;
+                    ++it;
+                }
+            }
+            return ret;
+        }
+
         bitworld inflate() {
             bitworld nb;
             for (auto it = world.begin(); it != world.end(); ++it) {
@@ -544,7 +588,7 @@ namespace apg {
 
             std::pair<int32_t, int32_t> record(-1000000000, -1000000000);
             uint64_t recordcell = 0;
-            for (auto it = world.begin(); it != world.end(); /* no increment */ ) {
+            for (auto it = world.begin(); it != world.end(); /* no increment */ ) {// would be more efficient backwards
                 uint64_t tile = it->second;
                 if (tile == 0) {
                     it = world.erase(it);

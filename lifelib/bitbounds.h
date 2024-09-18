@@ -115,18 +115,21 @@ namespace apg {
 
     uint64_t uint64_bottom(uint64_t tile) {
         uint64_t dy = 0;
-        if (tile & 0xff00000000000000ull) {
-            dy = 7;
-        } else if (tile & 0x00ff000000000000ull) {
-            dy = 6;
-        } else if (tile & 0x0000ff0000000000ull) {
-            dy = 5;
-        } else if (tile & 0x000000ff00000000ull) {
+        if (tile & 0xffffffff00000000ull) {
             dy = 4;
-        } else if (tile & 0x00000000ff000000ull) {
-            dy = 3;
-        } else if (tile & 0x0000000000ff0000ull) {
+            if (tile & 0xffff000000000000ull) {
+                dy = 6;
+                if (tile & 0xff00000000000000ull) {
+                    dy = 7;
+                }
+            } else if (tile & 0x0000ff0000000000ull) {
+                dy = 5;
+            }
+        } else if (tile & 0x00000000ffff0000ull) {
             dy = 2;
+            if (tile & 0x00000000ff000000ull) {
+                dy = 3;
+            }
         } else if (tile & 0x000000000000ff00ull) {
             dy = 1;
         }
@@ -135,154 +138,185 @@ namespace apg {
 
     uint64_t uint64_bl(uint64_t tile) {
         uint64_t dz = 14;
-        if (tile & 0x0100000000000000ull) {
-            dz = 0;
-        } else if (tile & 0x0201000000000000ull) {
-            dz = 1;
-        } else if (tile & 0x0402010000000000ull) {
-            dz = 2;
-        } else if (tile & 0x0804020100000000ull) {
-            dz = 3;
-        } else if (tile & 0x1008040201000000ull) {
-            dz = 4;
-        } else if (tile & 0x2010080402010000ull) {
-            dz = 5;
-        } else if (tile & 0x4020100804020100ull) {
-            dz = 6;
-        } else if (tile & 0x8040201008040201ull) {
+        if (tile & 0xff7f3f1f0f070301ull) {
             dz = 7;
-        } else if (tile & 0x0080402010080402ull) {
-            dz = 8;
-        } else if (tile & 0x0000804020100804ull) {
-            dz = 9;
-        } else if (tile & 0x0000008040201008ull) {
-            dz = 10;
-        } else if (tile & 0x0000000080402010ull) {
+            if (tile & 0x0f07030100000000ull) {
+                dz = 3;
+                if (tile & 0x0301000000000000ull) {
+                    dz = 1;
+                    if (tile & 0x0100000000000000ull) {
+                        dz = 0;
+                    }
+                } else if (tile & 0x0402010000000000ull) {
+                    dz = 2;
+                }
+            } else if (tile & 0x30180c0603010000ull) {
+                dz = 5;
+                if (tile & 0x1008040201000000ull) {
+                    dz = 4;
+                }
+            } else if (tile & 0x4020100804020100ull) {
+                dz = 6;
+            }
+        } else if (tile & 0x0080c0e0f0783c1eull) {
             dz = 11;
-        } else if (tile & 0x0000000000804020ull) {
-            dz = 12;
-        } else if (tile & 0x0000000000008040ull) {
+            if (tile & 0x0080c06030180c06ull) {
+                dz = 9;
+                if (tile & 0x0080402010080402ull) {
+                    dz = 8;
+                }
+            } else if (tile & 0x0000008040201008ull) {
+                dz = 10;
+            }
+        } else if (tile & 0x000000000080c060ull) {
             dz = 13;
+            if (tile & 0x0000000000804020ull) {
+                dz = 12;
+            }
         }
         return dz;
     }
 
     uint64_t uint64_tr(uint64_t tile) {
         uint64_t dz = 0;
-        if (tile & 0x0000000000000080ull) {
-            dz = 14;
-        } else if (tile & 0x0000000000008040ull) {
-            dz = 13;
-        } else if (tile & 0x0000000000804020ull) {
-            dz = 12;
-        } else if (tile & 0x0000000080402010ull) {
-            dz = 11;
-        } else if (tile & 0x0000008040201008ull) {
-            dz = 10;
-        } else if (tile & 0x0000804020100804ull) {
-            dz = 9;
-        } else if (tile & 0x0080402010080402ull) {
-            dz = 8;
-        } else if (tile & 0x8040201008040201ull) {
+        if (tile & 0x80c0e0f0f8fcfeffull) {
             dz = 7;
-        } else if (tile & 0x4020100804020100ull) {
-            dz = 6;
-        } else if (tile & 0x2010080402010000ull) {
-            dz = 5;
-        } else if (tile & 0x1008040201000000ull) {
-            dz = 4;
-        } else if (tile & 0x0804020100000000ull) {
+            if (tile & 0x0000000080c0e0f0ull) {
+                dz = 11;
+                if (tile & 0x00000000000080c0ull) {
+                    dz = 13;
+                    if (tile & 0x0000000000000080ull) {
+                        dz = 14;
+                    }
+                } else if (tile & 0x0000000000804020ull) {
+                    dz = 12;
+                }
+            } else if (tile & 0x000080c06030180cull) {
+                dz = 9;
+                if (tile & 0x0000008040201008ull) {
+                    dz = 10;
+                }
+            } else if (tile & 0x0080402010080402ull) {
+                dz = 8;
+            }
+        } else if (tile & 0x783c1e0f07030100ull) {
             dz = 3;
-        } else if (tile & 0x0402010000000000ull) {
-            dz = 2;
-        } else if (tile & 0x0201000000000000ull) {
+            if (tile & 0x6030180c06030100ull) {
+                dz = 5;
+                if (tile & 0x4020100804020100ull) {
+                    dz = 6;
+                }
+            } else if (tile & 0x1008040201000000ull) {
+                dz = 4;
+            }
+        } else if (tile & 0x0603010000000000ull) {
             dz = 1;
+            if (tile & 0x0402010000000000ull) {
+                dz = 2;
+            }
         }
         return dz;
     }
 
     uint64_t uint64_tl(uint64_t tile) {
         uint64_t dz = 14;
-        if (tile & 0x0000000000000001ull) {
-            dz = 0;
-        } else if (tile & 0x0000000000000102ull) {
-            dz = 1;
-        } else if (tile & 0x0000000000010204ull) {
-            dz = 2;
-        } else if (tile & 0x0000000001020408ull) {
-            dz = 3;
-        } else if (tile & 0x0000000102040810ull) {
-            dz = 4;
-        } else if (tile & 0x0000010204081020ull) {
-            dz = 5;
-        } else if (tile & 0x0001020408102040ull) {
-            dz = 6;
-        } else if (tile & 0x0102040810204080ull) {
+        if (tile & 0x0103070f1f3f7fffull) {
             dz = 7;
-        } else if (tile & 0x0204081020408000ull) {
-            dz = 8;
-        } else if (tile & 0x0408102040800000ull) {
-            dz = 9;
-        } else if (tile & 0x0810204080000000ull) {
-            dz = 10;
-        } else if (tile & 0x1020408000000000ull) {
+            if (tile & 0x000000000103070full) {
+                dz = 3;
+                if (tile & 0x0000000000000103ull) {
+                    dz = 1;
+                    if (tile & 0x0000000000000001ull) {
+                        dz = 0;
+                    }
+                } else if (tile & 0x0000000000010204ull) {
+                    dz = 2;
+                }
+            } else if (tile & 0x00000103060c1830ull) {
+                dz = 5;
+                if (tile & 0x0000000102040810ull) {
+                    dz = 4;
+                }
+            } else if (tile & 0x0001020408102040ull) {
+                dz = 6;
+            }
+        } else if (tile & 0x1e3c78f0e0c08000ull) {
             dz = 11;
-        } else if (tile & 0x2040800000000000ull) {
-            dz = 12;
-        } else if (tile & 0x4080000000000000ull) {
+            if (tile & 0x060c183060c08000ull) {
+                dz = 9;
+                if (tile & 0x0204081020408000ull) {
+                    dz = 8;
+                }
+            } else if (tile & 0x0810204080000000ull) {
+                dz = 10;
+            }
+        } else if (tile & 0x60c0800000000000ull) {
             dz = 13;
+            if (tile & 0x2040800000000000ull) {
+                dz = 12;
+            }
         }
         return dz;
     }
 
     uint64_t uint64_br(uint64_t tile) {
         uint64_t dz = 0;
-        if (tile & 0x8000000000000000ull) {
-            dz = 14;
-        } else if (tile & 0x4080000000000000ull) {
-            dz = 13;
-        } else if (tile & 0x2040800000000000ull) {
-            dz = 12;
-        } else if (tile & 0x1020408000000000ull) {
-            dz = 11;
-        } else if (tile & 0x0810204080000000ull) {
-            dz = 10;
-        } else if (tile & 0x0408102040800000ull) {
-            dz = 9;
-        } else if (tile & 0x0204081020408000ull) {
-            dz = 8;
-        } else if (tile & 0x0102040810204080ull) {
+        if (tile & 0xfffefcf8f0e0c080ull) {
             dz = 7;
-        } else if (tile & 0x0001020408102040ull) {
-            dz = 6;
-        } else if (tile & 0x0000010204081020ull) {
-            dz = 5;
-        } else if (tile & 0x0000000102040810ull) {
-            dz = 4;
-        } else if (tile & 0x0000000001020408ull) {
+            if (tile & 0xf0e0c08000000000ull) {
+                dz = 11;
+                if (tile & 0xc080000000000000ull) {
+                    dz = 13;
+                    if (tile & 0x8000000000000000ull) {
+                        dz = 14;
+                    }
+                } else if (tile & 0x2040800000000000ull) {
+                    dz = 12;
+                }
+            } else if (tile & 0x0c183060c0800000ull) {
+                dz = 9;
+                if (tile & 0x0810204080000000ull) {
+                    dz = 10;
+                }
+            } else if (tile & 0x0204081020408000ull) {
+                dz = 8;
+            }
+        } else if (tile & 0x000103070f1e3c78ull) {
             dz = 3;
-        } else if (tile & 0x0000000000010204ull) {
-            dz = 2;
-        } else if (tile & 0x0000000000000102ull) {
+            if (tile & 0x000103060c183060ull) {
+                dz = 5;
+                if (tile & 0x0001020408102040ull) {
+                    dz = 6;
+                }
+            } else if (tile & 0x0000000102040810ull) {
+                dz = 4;
+            }
+        } else if (tile & 0x0000000000010306ull) {
             dz = 1;
+            if (tile & 0x0000000000010204ull) {
+                dz = 2;
+            }
         }
         return dz;
     }
 
     uint64_t uint64_top(uint64_t tile) {
         uint64_t dy = 7;
-        if (tile & 0x00000000000000ffull) {
-            dy = 0;
-        } else if (tile & 0x000000000000ff00ull) {
-            dy = 1;
-        } else if (tile & 0x0000000000ff0000ull) {
-            dy = 2;
-        } else if (tile & 0x00000000ff000000ull) {
+        if (tile & 0x00000000ffffffffull) {
             dy = 3;
-        } else if (tile & 0x000000ff00000000ull) {
-            dy = 4;
-        } else if (tile & 0x0000ff0000000000ull) {
+            if (tile & 0x000000000000ffffull) {
+                dy = 1;
+                if (tile & 0x00000000000000ffull) {
+                    dy = 0;
+                }
+            } else if (tile & 0x0000000000ff0000ull) {
+                dy = 2;
+            }
+        } else if (tile & 0x0000ffff00000000ull) {
             dy = 5;
+            if (tile & 0x000000ff00000000ull) {
+                dy = 4;
+            }
         } else if (tile & 0x00ff000000000000ull) {
             dy = 6;
         }
@@ -291,18 +325,21 @@ namespace apg {
 
     uint64_t uint64_right(uint64_t tile) {
         uint64_t dx = 0;
-        if (tile & 0x8080808080808080ull) {
-            dx = 7;
-        } else if (tile & 0x4040404040404040ull) {
-            dx = 6;
-        } else if (tile & 0x2020202020202020ull) {
-            dx = 5;
-        } else if (tile & 0x1010101010101010ull) {
+        if (tile & 0xf0f0f0f0f0f0f0f0ull) {
             dx = 4;
-        } else if (tile & 0x0808080808080808ull) {
-            dx = 3;
-        } else if (tile & 0x0404040404040404ull) {
+            if (tile & 0xc0c0c0c0c0c0c0c0ull) {
+                dx = 6;
+                if (tile & 0x8080808080808080ull) {
+                    dx = 7;
+                }
+            } else if (tile & 0x2020202020202020ull) {
+                dx = 5;
+            }
+        } else if (tile & 0x0c0c0c0c0c0c0c0cull) {
             dx = 2;
+            if (tile & 0x0808080808080808ull) {
+                dx = 3;
+            }
         } else if (tile & 0x0202020202020202ull) {
             dx = 1;
         }
@@ -311,22 +348,24 @@ namespace apg {
 
     uint64_t uint64_left(uint64_t tile) {
         uint64_t dx = 7;
-        if (tile & 0x0101010101010101ull) {
-            dx = 0;
-        } else if (tile & 0x0202020202020202ull) {
-            dx = 1;
-        } else if (tile & 0x0404040404040404ull) {
-            dx = 2;
-        } else if (tile & 0x0808080808080808ull) {
+        if (tile & 0x0f0f0f0f0f0f0f0full) {
             dx = 3;
-        } else if (tile & 0x1010101010101010ull) {
-            dx = 4;
-        } else if (tile & 0x2020202020202020ull) {
+            if (tile & 0x0303030303030303ull) {
+                dx = 1;
+                if (tile & 0x0101010101010101ull) {
+                    dx = 0;
+                }
+            } else if (tile & 0x0404040404040404ull) {
+                dx = 2;
+            }
+        } else if (tile & 0x3030303030303030ull) {
             dx = 5;
+            if (tile & 0x1010101010101010ull) {
+                dx = 4;
+            }
         } else if (tile & 0x4040404040404040ull) {
             dx = 6;
         }
         return dx;
     }
-
 }
